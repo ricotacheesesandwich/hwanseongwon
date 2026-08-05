@@ -1,0 +1,489 @@
+   빙혼자로 접속한 플레이어에게만 적용됩니다.
+   관리자와 생환자 화면은 기존 밝은 테마를 유지합니다. */
+body.theme-spirit {
+  color-scheme: dark;
+  --navy-950: #090405;
+  --navy-900: #16090c;
+  --navy-800: #2a1016;
+  --navy-700: #4a1923;
+  --blue-600: #b72e42;
+  --blue-500: #d44858;
+  --blue-300: #ef8993;
+  --cyan-300: #e06a73;
+  --green-600: #d36a59;
+  --green-100: #32191a;
+  --red-700: #ef7380;
+  --red-500: #d44858;
+  --red-100: #321317;
+  --amber-600: #e18a67;
+  --amber-100: #342019;
+  --ink: #f5e9eb;
+  --muted: #bca4aa;
+  --line: #452b31;
+  --line-strong: #624049;
+  --surface: #181114;
+  --surface-soft: #21171a;
+  --surface-blue: #2b151a;
+  --shadow: 0 18px 42px rgba(0, 0, 0, .48);
+  background: #090607;
+  color: var(--ink);
+}
+
+body.theme-spirit .app-shell,
+body.theme-spirit .app-shell--spirit {
+  background:
+    radial-gradient(circle at 52% 18%, rgba(161, 33, 51, .12), transparent 34%),
+    #0b0708;
+}
+
+body.theme-spirit .topbar {
+  background:
+    linear-gradient(90deg, #070304 0%, #16090c 46%, #260d14 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .48), inset 0 -1px 0 rgba(214, 71, 86, .18);
+}
+
+body.theme-spirit .brand__copy span,
+body.theme-spirit .session-badge span {
+  color: #c5a0a7;
+}
+
+body.theme-spirit .brand__seal {
+  color: #f3c9ce;
+  box-shadow: inset 0 0 0 4px transparent, inset 0 0 0 5px currentColor, 0 0 24px rgba(212, 72, 88, .2);
+}
+
+body.theme-spirit .event-button {
+  border-color: rgba(222, 76, 91, .76);
+  background: rgba(122, 24, 39, .32);
+  color: #ffc4ca;
+}
+
+body.theme-spirit .sidebar,
+body.theme-spirit .map-panel {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .35);
+}
+
+body.theme-spirit .sidebar-header,
+body.theme-spirit .map-panel__toolbar,
+body.theme-spirit .map-panel__footer {
+  border-color: var(--line);
+  background: rgba(24, 17, 20, .97);
+}
+
+body.theme-spirit .sidebar-header h2,
+body.theme-spirit .sidebar-header h3,
+body.theme-spirit .map-panel__toolbar h2,
+body.theme-spirit .selected-summary h3,
+body.theme-spirit .player-profile__identity h2 {
+  color: #f7eaec;
+}
+
+body.theme-spirit .eyebrow {
+  color: #ad7882;
+}
+
+body.theme-spirit .button {
+  border-color: var(--line-strong);
+  background: #21171a;
+  color: #f5e8ea;
+}
+
+body.theme-spirit .button:hover {
+  border-color: #d44858;
+  background: #2b191e;
+}
+
+body.theme-spirit .button--primary,
+body.theme-spirit .button--dark,
+body.theme-spirit .button--admin {
+  border-color: #a8273a;
+  background: linear-gradient(180deg, #c83f4f, #9f2438);
+  color: #fff5f6;
+}
+
+body.theme-spirit .button--soft {
+  border-color: #55323a;
+  background: #25181c;
+}
+
+body.theme-spirit .floor-tabs button {
+  border-color: #4d3036;
+  background: #1b1215;
+  color: #cbb4b9;
+}
+
+body.theme-spirit .floor-tabs button.is-active {
+  border-color: #cf4052;
+  background: linear-gradient(180deg, #b72e42, #8f2031);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(239, 137, 147, .22), 0 0 18px rgba(183, 46, 66, .18);
+}
+
+body.theme-spirit .player-profile,
+body.theme-spirit .sidebar-body {
+  color: var(--ink);
+}
+
+body.theme-spirit .stat-card,
+body.theme-spirit .status-list__item,
+body.theme-spirit .inventory-item,
+body.theme-spirit .record-item,
+body.theme-spirit .log-item,
+body.theme-spirit .connection-item,
+body.theme-spirit .team-summary-card,
+body.theme-spirit .compact-team-card,
+body.theme-spirit .panel-card,
+body.theme-spirit .modal-control-card,
+body.theme-spirit .detail-grid > div,
+body.theme-spirit .admin-character-overview,
+body.theme-spirit .destination-team-option,
+body.theme-spirit .destination-summary,
+body.theme-spirit .movement-confirmation__route span {
+  border-color: var(--line);
+  background: #21171a;
+  color: var(--ink);
+}
+
+body.theme-spirit .team-summary-card,
+body.theme-spirit .compact-team-card {
+  background: linear-gradient(135deg, #21171a, #1b1114);
+}
+
+body.theme-spirit .team-summary-card__head span,
+body.theme-spirit .team-member-row small,
+body.theme-spirit .shared-member-chip.is-muted,
+body.theme-spirit .inventory-item p,
+body.theme-spirit .record-item p,
+body.theme-spirit .log-item p,
+body.theme-spirit .connection-item p,
+body.theme-spirit .selected-summary p,
+body.theme-spirit .stat-card span,
+body.theme-spirit .destination-summary > span,
+body.theme-spirit .destination-summary p,
+body.theme-spirit .destination-team-option small,
+body.theme-spirit .destination-team-option em,
+body.theme-spirit .modal-control-card > p,
+body.theme-spirit .modal__body p {
+  color: var(--muted);
+}
+
+body.theme-spirit .shared-member-chip,
+body.theme-spirit .team-chip {
+  background: #32191f;
+  color: #efc4ca;
+}
+
+body.theme-spirit .role-chip--spirit {
+  background: #461720;
+  color: #ff9ba5;
+  box-shadow: inset 0 0 0 1px rgba(231, 82, 97, .28);
+}
+
+body.theme-spirit .role-chip--survivor {
+  background: #3b1c19;
+  color: #f0a08c;
+}
+
+body.theme-spirit .status-pill--online,
+body.theme-spirit .online-chip--online {
+  background: #36191d;
+  color: #e7838d;
+}
+
+body.theme-spirit .side-note {
+  border-color: #59333c;
+  background: linear-gradient(135deg, #2b151a, #221317);
+  color: #f0c7cc;
+}
+
+body.theme-spirit .side-note p {
+  color: #bca0a6;
+}
+
+body.theme-spirit .ap-meter {
+  background: #3b272c;
+}
+
+body.theme-spirit .ap-meter > span {
+  background: linear-gradient(90deg, #8f2031, #e25261);
+  box-shadow: 0 0 12px rgba(226, 82, 97, .38);
+}
+
+body.theme-spirit .map-viewport {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(146, 31, 46, .09), transparent 46%),
+    #0f0a0c;
+}
+
+body.theme-spirit .map-grid {
+  border-color: #6e3843;
+  background: #160f11;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 0 1px rgba(217, 72, 88, .12);
+}
+
+body.theme-spirit .map-cell,
+body.theme-spirit .map-cell.is-visible,
+body.theme-spirit .map-cell.is-fogged,
+body.theme-spirit .map-cell.is-unseen-reachable {
+  background: #1a1315;
+  color: #eadcdf;
+}
+
+body.theme-spirit .map-cell:nth-child(3n),
+body.theme-spirit .map-cell:nth-child(3n + 1) {
+  background: #1d1518;
+}
+
+body.theme-spirit .map-cell[data-edge-right="true"],
+body.theme-spirit .map-cell[data-edge-bottom="true"] {
+  border-color: #6b4550;
+}
+
+body.theme-spirit .map-cell:hover {
+  background: #29171c;
+  box-shadow: inset 0 0 0 2px rgba(216, 72, 88, .36);
+}
+
+body.theme-spirit .map-cell.is-active-room {
+  background:
+    radial-gradient(circle at center, rgba(193, 49, 68, .22), transparent 72%),
+    linear-gradient(rgba(145, 30, 46, .22), rgba(145, 30, 46, .22)),
+    #241317;
+}
+
+body.theme-spirit .map-cell.is-warm {
+  background:
+    radial-gradient(circle at center, rgba(255, 104, 74, .34), rgba(170, 34, 48, .12) 50%, rgba(32, 15, 18, .04) 78%),
+    #281519;
+  box-shadow: inset 0 0 24px rgba(241, 83, 73, .12);
+}
+
+body.theme-spirit .map-cell.is-danger {
+  background:
+    repeating-linear-gradient(-45deg, rgba(209, 58, 73, .10), rgba(209, 58, 73, .10) 8px, rgba(209, 58, 73, .23) 8px, rgba(209, 58, 73, .23) 12px),
+    #221317;
+  box-shadow: inset 0 0 0 2px rgba(231, 78, 93, .86);
+}
+
+body.theme-spirit .map-cell__room-label {
+  color: #ead9dc;
+  text-shadow: 0 1px 0 #090405;
+}
+
+body.theme-spirit .map-cell__marker {
+  border: 1px solid #5a343d;
+  background: rgba(29, 18, 22, .96);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .34);
+}
+
+body.theme-spirit .character-token {
+  border-color: #211417;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .58), 0 0 0 4px var(--team-color, var(--role-color)), 0 0 18px rgba(203, 58, 75, .22);
+}
+
+body.theme-spirit .character-token.is-selected {
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .58), 0 0 0 4px #1a0d11, 0 0 0 7px var(--team-color, #d44858), 0 0 22px rgba(212, 72, 88, .35);
+}
+
+body.theme-spirit .avatar__role-mark,
+body.theme-spirit .character-token__status {
+  border-color: #211417;
+}
+
+body.theme-spirit .warmth-banner {
+  border-color: #6e3037;
+  background: linear-gradient(90deg, #1b0d10, #4a171c, #1b0d10);
+  color: #ffb09c;
+  box-shadow: inset 0 -1px 0 rgba(255, 113, 91, .12);
+}
+
+body.theme-spirit .map-toast {
+  background: rgba(59, 15, 23, .96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .44), 0 0 0 1px rgba(220, 73, 88, .24);
+}
+
+body.theme-spirit .legend-box {
+  background: #24171a;
+}
+
+body.theme-spirit .legend-box--visible,
+body.theme-spirit .legend-box--reachable {
+  border-color: #d44858;
+  background: rgba(196, 54, 73, .2);
+}
+
+body.theme-spirit .movement-rule {
+  border-color: #59333b;
+  background: #25151a;
+  color: #efc7cc;
+}
+
+body.theme-spirit .sidebar--right {
+  background: #13090c;
+}
+
+body.theme-spirit .panel-card__header {
+  border-color: #4a2d34;
+  background: #2c1b20;
+}
+
+body.theme-spirit .panel-tabs {
+  background: rgba(255, 255, 255, .05);
+}
+
+body.theme-spirit .panel-tab {
+  color: #b99fa5;
+}
+
+body.theme-spirit .panel-tab.is-active,
+body.theme-spirit .layer-toggle {
+  border-color: #54343b;
+  background: #24171a;
+  color: #ecdadd;
+}
+
+body.theme-spirit .layer-toggle.is-active {
+  border-color: #cf4052;
+  background: #35171e;
+  color: #ff9da8;
+}
+
+body.theme-spirit .campus-mini-map,
+body.theme-spirit .campus-node {
+  border-color: #55363d;
+  background: #1d1416;
+  color: #d9c3c7;
+}
+
+body.theme-spirit .modal-backdrop {
+  background: rgba(5, 1, 2, .78);
+}
+
+body.theme-spirit .modal,
+body.theme-spirit .modal__header,
+body.theme-spirit .modal__footer {
+  border-color: var(--line);
+  background: #181114;
+  color: var(--ink);
+}
+
+body.theme-spirit .modal {
+  box-shadow: 0 28px 84px rgba(0, 0, 0, .64), 0 0 0 1px rgba(214, 71, 86, .14);
+}
+
+body.theme-spirit .modal__header .icon-button {
+  border-color: #55343b;
+  color: #f3dadd;
+}
+
+body.theme-spirit input,
+body.theme-spirit select,
+body.theme-spirit textarea,
+body.theme-spirit .form-control {
+  border-color: #57363e;
+  background: #120d0f;
+  color: #f3e6e8;
+}
+
+body.theme-spirit input::placeholder,
+body.theme-spirit textarea::placeholder {
+  color: #886f75;
+}
+
+body.theme-spirit .comparison-section {
+  border-color: var(--line);
+  background: #120d0f;
+}
+
+body.theme-spirit .comparison-card {
+  border-color: var(--line);
+  background: #1b1215;
+}
+
+body.theme-spirit .comparison-card header {
+  border-color: var(--line);
+}
+
+body.theme-spirit .comparison-map,
+body.theme-spirit .mini-cell {
+  background: #171013;
+}
+
+body.theme-spirit .mini-cell.is-visible {
+  box-shadow: inset 0 0 0 99px rgba(190, 45, 65, .12);
+}
+
+body.theme-spirit .mini-cell.is-warm {
+  background: #552128;
+}
+
+body.theme-spirit .mini-cell.is-danger {
+  background: #491820;
+}
+
+body.theme-spirit .empty-state,
+body.theme-spirit .form-message {
+  color: #b98f97;
+}
+
+/* 2026-07-31: 빙혼자 다크 테마에서도 전체 도면 구조는 항상 보이게 유지합니다.
+   방 오버레이(map-room)가 지도 구조를 담당하고, 투명한 셀은 클릭 영역만 제공합니다. */
+body.theme-spirit .map-room {
+  border-right-color: #70434d;
+  border-bottom-color: #70434d;
+  background:
+    linear-gradient(rgba(255, 255, 255, .012), rgba(255, 255, 255, .012)),
+    #191214;
+  color: #f0dfe2;
+  box-shadow: inset 0 0 0 1px rgba(225, 105, 120, .035);
+}
+
+body.theme-spirit .map-room span {
+  color: #f1e2e5;
+  text-shadow: 0 1px 0 #080405;
+}
+
+body.theme-spirit .map-room.is-active-room {
+  background:
+    radial-gradient(circle at center, rgba(202, 49, 70, .24), transparent 72%),
+    linear-gradient(rgba(142, 27, 43, .25), rgba(142, 27, 43, .25)),
+    #241317;
+  box-shadow: inset 0 0 26px rgba(219, 63, 82, .09);
+}
+
+body.theme-spirit .map-room.is-warm {
+  background:
+    radial-gradient(circle at center, rgba(255, 105, 71, .32), rgba(180, 38, 51, .14) 48%, transparent 78%),
+    #291619;
+  box-shadow: inset 0 0 34px rgba(255, 91, 78, .12);
+}
+
+body.theme-spirit .map-cell,
+body.theme-spirit .map-cell.is-visible,
+body.theme-spirit .map-cell.is-fogged,
+body.theme-spirit .map-cell.is-unseen-reachable,
+body.theme-spirit .map-cell:nth-child(3n),
+body.theme-spirit .map-cell:nth-child(3n + 1) {
+  background: transparent;
+  color: #eadcdf;
+}
+
+body.theme-spirit .map-cell:hover {
+  background: rgba(215, 64, 82, .055);
+  box-shadow: inset 0 0 0 2px rgba(216, 72, 88, .25);
+}
+
+body.theme-spirit .map-cell.is-danger {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(209, 58, 73, .07),
+    rgba(209, 58, 73, .07) 8px,
+    rgba(209, 58, 73, .20) 8px,
+    rgba(209, 58, 73, .20) 12px
+  );
+  box-shadow: inset 0 0 0 2px rgba(231, 78, 93, .86);
+}
+
+/* ===== 운영진 통합 운영페이지 ===== */

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0c2744" />
+    <title>생환대학교 부설 학술원 조사 시스템</title>
+    <link rel="stylesheet" href="./css/01-foundation.css" />
+    <link rel="stylesheet" href="./css/02-app-shell.css" />
+    <link rel="stylesheet" href="./css/03-map-and-teams.css" />
+    <link rel="stylesheet" href="./css/04-spirit-theme.css" />
+    <link rel="stylesheet" href="./css/05-admin-operations.css" />
+    <link rel="stylesheet" href="./css/06-feature-overrides.css" />
+  </head>
+  <body>
+    <noscript>이 사이트는 JavaScript가 필요합니다.</noscript>
+
+    <section
+      id="loginView"
+      class="login-view login-view--search"
+      aria-labelledby="loginTitle"
+    >
+      <div class="login-card login-card--search">
+        <div class="brand brand--login">
+          <div class="brand__seal" aria-hidden="true">SHU</div>
+          <div>
+            <p class="eyebrow">SAENGHWAN UNIVERSITY INSTITUTE</p>
+            <h1 id="loginTitle">학술원 조사 시스템</h1>
+          </div>
+        </div>
+
+        <form id="characterLoginForm" class="login-form login-form--search">
+          <label for="characterIdInput">접속 ID 검색</label>
+          <div class="login-form__row">
+            <input
+              id="characterIdInput"
+              name="characterId"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="4"
+              placeholder="ID를 입력하세요"
+              required
+            />
+            <button type="submit" class="button button--primary">검색</button>
+          </div>
+          <p id="loginError" class="form-message" role="alert"></p>
+        </form>
+
+        <div
+          id="loginSearchResult"
+          class="login-search-result"
+          aria-live="polite"
+        ></div>
+      </div>
+    </section>
+
+    <div id="appView" class="app-shell is-hidden">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand__seal" aria-hidden="true">SHU</div>
+          <div class="brand__copy">
+            <strong>생환대학교 부설 학술원 조사 시스템</strong>
+            <span>공간 이동 · 팀 위치 공유 · 조사 기록</span>
+          </div>
+        </div>
+
+        <nav
+          id="viewModeNav"
+          class="view-mode-nav"
+          aria-label="관리자 시점 전환"
+        >
+          <button type="button" data-view-mode="survivor">생환자 시점</button>
+          <button type="button" data-view-mode="spirit">빙혼자 시점</button>
+          <button type="button" data-view-mode="admin" class="is-active">
+            관리자 시점
+          </button>
+        </nav>
+
+        <!-- 상단 중앙: 이벤트와 로그인 정보 -->
+        <div class="topbar__center">
+          <button
+            id="adminOperationsButton"
+            type="button"
+            class="button button--operations admin-only"
+          >
+            운영페이지
+          </button>
+
+          <button id="eventButton" type="button" class="event-button">
+            <span aria-hidden="true">!</span>
+            긴급 이벤트 0건
+          </button>
+
+          <div id="sessionBadge" class="session-badge"></div>
+        </div>
+
+        <!-- 상단 오른쪽: 테마 변경과 로그아웃 -->
+        <div class="topbar__actions">
+          <button
+            id="themeToggleButton"
+            type="button"
+            class="theme-toggle"
+            role="switch"
+            aria-checked="false"
+            aria-label="다크모드로 전환"
+          >
+            <span class="theme-toggle__track" aria-hidden="true">
+              <span class="theme-toggle__thumb"></span>
+            </span>
+
+            <span id="themeToggleLabel" class="theme-toggle__label">
+              라이트
+            </span>
+          </button>
+
+          <button
+            id="logoutButton"
+            type="button"
+            class="icon-button"
+            title="로그아웃"
+            aria-label="로그아웃"
+          >
+            ↪
+          </button>
+        </div>
+      </header>
+
+      <main id="workspace" class="workspace">
+        <aside id="leftSidebar" class="sidebar sidebar--left"></aside>
+
+        <section class="map-panel" aria-labelledby="mapTitle">
+          <div class="map-panel__toolbar">
+            <div>
+              <p class="eyebrow">INTERACTIVE FLOOR MAP</p>
+              <h2 id="mapTitle">
+                융합학술동 <span id="currentFloorLabel">1F</span>
+              </h2>
+            </div>
+
+            <div id="floorTabs" class="floor-tabs" aria-label="층 선택"></div>
+
+            <div class="map-toolbar-actions">
+              <button
+                id="investigateButton"
+                type="button"
+                class="button button--soft"
+              >
+                현재 위치 조사
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="warmthBanner"
+            class="warmth-banner is-hidden"
+            role="status"
+          ></div>
+
+          <div class="map-viewport">
+            <div
+              id="mapGrid"
+              class="map-grid"
+              role="grid"
+              aria-label="공간 단위 지도"
+            ></div>
+            <div id="mapToast" class="map-toast is-hidden" role="status"></div>
+          </div>
+
+          <div class="map-panel__footer">
+            <article
+              id="selectedCharacterSummary"
+              class="selected-summary"
+            ></article>
+            <div class="map-legend" aria-label="지도 범례">
+              <span
+                ><i class="legend-box legend-box--visible"></i>현재 위치한
+                공간</span
+              >
+              <span
+                ><i class="legend-dot legend-dot--blue"></i>같은 공간 · 표시
+                그룹</span
+              >
+              <span><i class="legend-box legend-box--danger"></i>위험구역</span>
+            </div>
+            <p id="movementRule" class="movement-rule">
+              빙혼자 · 공간 변경 1회 = 행동력 1
+            </p>
+          </div>
+        </section>
+
+        <aside id="rightSidebar" class="sidebar sidebar--right"></aside>
+      </main>
+
+      <section
+        id="adminOperationsView"
+        class="operations-page is-hidden"
+        aria-labelledby="operationsPageTitle"
+      >
+        <div id="adminOperationsContent"></div>
+      </section>
+    </div>
+
+    <div id="modalBackdrop" class="modal-backdrop is-hidden" aria-hidden="true">
+      <section
+        id="modal"
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <header class="modal__header">
+          <div>
+            <p id="modalEyebrow" class="eyebrow"></p>
+            <h2 id="modalTitle"></h2>
+          </div>
+          <button
+            id="modalCloseButton"
+            type="button"
+            class="icon-button"
+            aria-label="창 닫기"
+          >
+            ×
+          </button>
+        </header>
+        <div id="modalBody" class="modal__body"></div>
+        <footer id="modalFooter" class="modal__footer"></footer>
+      </section>
+    </div>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <span aria-hidden="true">◇</span>
+        <p>표시할 기록이 없습니다.</p>
+      </div>
+    </template>
+    <script src="./js/app.js" defer></script>
+  </body>
+</html>
