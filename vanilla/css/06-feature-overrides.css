@@ -5015,3 +5015,162 @@ body.theme-admin.theme-mode-dark
     right: 14px;
   }
 }
+
+/* =========================================================
+   전체 부지 지도 위치 + 즉시 호버 + 환경설정 층 그룹
+   ========================================================= */
+
+/* 융합학술동을 노란 기준선 쪽까지 더 위로 */
+.campus-map-popup .campus-building--main {
+  bottom: 22.5%;
+}
+
+/* H 헬기장: 연구별관 위쪽 안쪽으로 이동 */
+.campus-map-popup .campus-building--research .campus-helipad {
+  top: -58px;
+  right: 38px;
+  z-index: 6;
+}
+
+/* hover 기존 느린 transition 완전 제거 */
+.campus-map-popup .campus-building,
+.campus-map-popup .campus-building *,
+.campus-map-popup .campus-building::before,
+.campus-map-popup .campus-building::after {
+  transition: none;
+  animation: none;
+}
+
+/* 기본 위치 */
+.campus-map-popup .campus-building--living,
+.campus-map-popup .campus-building--research {
+  transform: none;
+}
+
+.campus-map-popup .campus-building--support,
+.campus-map-popup .campus-building--main {
+  transform: translateX(-50%);
+}
+
+/* 올리는 반응은 즉시 */
+.campus-map-popup .campus-building--living:hover,
+.campus-map-popup .campus-building--research:hover {
+  transform: translateY(-4px);
+}
+
+.campus-map-popup .campus-building--support:hover,
+.campus-map-popup .campus-building--main:hover {
+  transform: translateX(-50%) translateY(-4px);
+}
+
+.campus-map-popup .campus-building:hover {
+  z-index: 8;
+  border-color: #59b8e4;
+  box-shadow:
+    0 0 0 2px rgba(89, 184, 228, 0.22),
+    0 0 20px rgba(89, 184, 228, 0.44),
+    0 14px 28px rgba(12, 39, 68, 0.18);
+}
+
+/* 현재 선택 건물 아우라 유지 */
+.campus-map-popup .campus-building.is-current-building {
+  border-color: #42b6e5;
+  box-shadow:
+    0 0 0 2px rgba(66, 182, 229, 0.3),
+    0 0 24px rgba(66, 182, 229, 0.52),
+    0 10px 24px rgba(12, 39, 68, 0.12);
+}
+
+/* 환경설정: 늘어난 층을 건물별로 보기 좋게 정리 */
+.settings-floor-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-floor-group {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.settings-floor-group h4 {
+  margin: 0 0 9px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.settings-floor-group .settings-toggle-grid--floors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+  gap: 8px;
+}
+
+body.theme-admin.theme-mode-dark .settings-floor-group {
+  border-color: #3b4246;
+  background: #171717;
+}
+
+body.theme-admin.theme-mode-dark .settings-floor-group h4 {
+  color: #f5f7f8;
+}
+
+/* =========================================================
+   층별 지도 공백·경계선 최종 보정
+   ========================================================= */
+
+/* 지도 조사/위험 요소는 더 이상 표시하지 않음 */
+.map-cell__marker--investigation,
+.map-cell__marker--done,
+.map-cell.is-danger,
+.map-cell[data-danger="true"],
+.map-cell.danger-zone,
+.map-legend .legend-box--danger,
+.map-legend .danger-swatch,
+.map-legend .danger-marker,
+.map-legend [data-legend="danger"] {
+  display: none;
+}
+
+/* 중첩 배치된 내부 방은 기본 CSS가 우/하단 선만 그리므로
+   필요한 방에 상단/좌측 경계선을 명시적으로 추가 */
+.map-room[data-room-id="research_b2_records"],
+.map-room[data-room-id="support_server"],
+.map-room[data-room-id="living_2f_lounge"],
+.map-room[data-room-id="living_2f_water"],
+.map-room[data-room-id="living_2f_shower"],
+.map-room[data-room-id="living_3f_lounge"],
+.map-room[data-room-id="living_3f_water"],
+.map-room[data-room-id="living_3f_shower"],
+.map-room[data-room-id="living_4f_meeting"] {
+  border-top: 3px solid #40556a;
+  border-left: 3px solid #40556a;
+}
+
+/* 관리지원동 서버는 왼쪽 선이 특히 명확하게 보이게 */
+.map-room[data-room-id="support_server"] {
+  border-left-width: 3px;
+}
+
+/* 연구별관 B3는 일반 지도와 같은 중성 계열 */
+.map-room[data-room-id^="research_b3_"] {
+  background-image: none;
+}
+
+/* 다크모드에서도 새로 보강한 선이 묻히지 않게 */
+body.theme-admin.theme-mode-dark
+  :is(
+    .map-room[data-room-id="research_b2_records"],
+    .map-room[data-room-id="support_server"],
+    .map-room[data-room-id="living_2f_lounge"],
+    .map-room[data-room-id="living_2f_water"],
+    .map-room[data-room-id="living_2f_shower"],
+    .map-room[data-room-id="living_3f_lounge"],
+    .map-room[data-room-id="living_3f_water"],
+    .map-room[data-room-id="living_3f_shower"],
+    .map-room[data-room-id="living_4f_meeting"]
+  ) {
+  border-top-color: #4c5a61;
+  border-left-color: #4c5a61;
+}

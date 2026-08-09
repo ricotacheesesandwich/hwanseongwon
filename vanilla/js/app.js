@@ -997,8 +997,6 @@
           <section class="panel-card">
             <div class="panel-card__header">지도 레이어</div>
             <div class="panel-card__body layer-toggle-list">
-              ${layerToggleMarkup("investigations", "조사 지점")}
-              ${layerToggleMarkup("danger", "위험구역")}
               ${layerToggleMarkup("corpseRoute", "시신 경로")}
               ${layerToggleMarkup("entities", "동결체")}
             </div>
@@ -1006,7 +1004,6 @@
           <section class="panel-card">
             <div class="panel-card__header">지도 편집</div>
             <div class="panel-card__body form-stack">
-              <button type="button" class="button ${ui.adminTool === "danger" ? "button--danger" : ""}" data-admin-action="toggle-danger">${ui.adminTool === "danger" ? "위험구역 편집 종료" : "위험구역 지정·해제"}</button>
               <p class="login-card__footnote">편집을 켠 뒤 지도에서 공간을 선택합니다.</p>
             </div>
           </section>
@@ -1110,7 +1107,6 @@
           <div class="panel-card__body control-grid">
             <button type="button" class="button ${ui.adminTool === "forceMove" ? "button--primary" : ""}" data-admin-action="toggle-force-move">${ui.adminTool === "forceMove" ? "개별 위치 지정 중 · 공간 선택" : "선택 캐릭터 이동"}</button>
             <button type="button" class="button ${ui.adminTool === "forceMoveGroup" ? "button--primary" : ""}" data-admin-action="toggle-force-move-group" ${team ? "" : "disabled"}>${ui.adminTool === "forceMoveGroup" ? "팀 이동 지정 중 · 공간 선택" : "소속 팀 전체 이동"}</button>
-            <button type="button" class="button ${ui.adminTool === "danger" ? "button--danger" : ""}" data-admin-action="toggle-danger">${ui.adminTool === "danger" ? "위험구역 편집 중 · 위치 선택" : "위험구역 편집"}</button>
           </div>
         </section>
 
@@ -1180,8 +1176,6 @@
         <section class="panel-card">
           <div class="panel-card__header">지도 레이어</div>
           <div class="panel-card__body layer-toggle-list">
-            ${layerToggleMarkup("investigations", "조사 지점")}
-            ${layerToggleMarkup("danger", "위험구역")}
             ${layerToggleMarkup("corpseRoute", "시신 경로")}
             ${layerToggleMarkup("entities", "동결체")}
           </div>
@@ -1437,8 +1431,6 @@
           movementActor.y === y
         )
           cellElement.classList.add("is-current");
-        if (state.layers.danger && isDangerCell(floor.id, x, y))
-          cellElement.classList.add("is-danger");
         if (getTransitionAt(floor.id, x, y))
           cellElement.classList.add("is-transition");
 
@@ -1471,18 +1463,7 @@
 
   function appendMapMarkers(cellElement, floor, x, y, perspective) {
     const key = cellKey(x, y);
-    const investigation = floor.investigations.find(
-      (item) => item.x === x && item.y === y,
-    );
     const actor = getMovementActor();
-
-    if (state.layers.investigations && investigation) {
-      const done = actor.investigations.includes(investigation.id);
-      cellElement.insertAdjacentHTML(
-        "beforeend",
-        `<span class="map-cell__marker ${done ? "map-cell__marker--done" : "map-cell__marker--investigation"}" title="${done ? "조사 완료" : "조사 가능"}">${done ? "✓" : "⌕"}</span>`,
-      );
-    }
 
     if (state.layers.entities) {
       const entity = floor.entities.find(
@@ -1510,17 +1491,6 @@
           `<span class="map-cell__marker map-cell__marker--corpse" title="시신 이동 경로">${escapeHtml(routePoint.label)}</span>`,
         );
       }
-    }
-
-    if (
-      state.layers.danger &&
-      isDangerCell(floor.id, x, y) &&
-      perspective.mode === "admin"
-    ) {
-      cellElement.insertAdjacentHTML(
-        "beforeend",
-        `<span class="map-cell__marker" title="운영진 지정 위험구역">!</span>`,
-      );
     }
 
     if (!floor.cells[key]) {
@@ -1604,7 +1574,6 @@
         const cell = floor.cells[cellKey(x, y)];
         const classes = ["mini-cell", "is-visible"];
         if (cell.roomId === activeRoomId) classes.push("is-active-room");
-        if (isDangerCell(floor.id, x, y)) classes.push("is-danger");
         if (warmth.active && cell.roomId === warmth.roomId)
           classes.push("is-warm");
         const tokens = getVisibleCharactersAtCell(
@@ -1807,12 +1776,6 @@
       return;
     }
 
-    if (session.type === "admin" && ui.adminTool === "danger") {
-      toggleDangerCell(ui.currentFloor, x, y);
-      renderAll();
-      return;
-    }
-
     if (session.type === "admin") {
       showTeamDestinationModal(ui.currentFloor, x, y);
       return;
@@ -1912,14 +1875,6 @@
 
     if (actor.statuses.includes("immobilized")) {
       showToast("행동불능 상태라 이동할 수 없습니다.");
-      return;
-    }
-
-    if (
-      isDangerCell(actor.floor, targetX, targetY) &&
-      session.type !== "admin"
-    ) {
-      showToast("운영진이 접근을 제한한 위험구역입니다.");
       return;
     }
 
@@ -2147,11 +2102,7 @@
       const action = adminButton.dataset.adminAction;
       handleAdminAction(action);
       if (
-        [
-          "toggle-force-move",
-          "toggle-force-move-group",
-          "toggle-danger",
-        ].includes(action) &&
+        ["toggle-force-move", "toggle-force-move-group"].includes(action) &&
         ui.adminTool
       ) {
         closeModal();
@@ -2418,17 +2369,6 @@
       return;
     }
 
-    if (action === "toggle-danger") {
-      ui.adminTool = ui.adminTool === "danger" ? null : "danger";
-      showToast(
-        ui.adminTool
-          ? "지도에서 위험구역으로 지정하거나 해제할 위치를 선택하세요."
-          : "위험구역 편집을 종료했습니다.",
-      );
-      renderAll();
-      return;
-    }
-
     if (action === "reset-demo") showResetConfirmation();
   }
 
@@ -2516,23 +2456,6 @@
     renderComparison();
   }
 
-  function toggleDangerCell(floor, x, y) {
-    const key = mapKey(floor, x, y);
-    const index = state.dangerZones.indexOf(key);
-    if (index >= 0) {
-      state.dangerZones.splice(index, 1);
-      addLog(
-        `관리자가 ${floor} ${getRoomLabel(floor, x, y)}의 위험구역 지정을 해제했습니다.`,
-      );
-    } else {
-      state.dangerZones.push(key);
-      addLog(
-        `관리자가 ${floor} ${getRoomLabel(floor, x, y)}의 칸을 위험구역으로 지정했습니다.`,
-      );
-    }
-    persistState();
-  }
-
   function getPerspective() {
     if (session.type === "player") {
       const character = getCharacter(session.characterId);
@@ -2603,8 +2526,7 @@
         const y = current.y + dy;
         if (
           !isWithinGrid(x, y) ||
-          !canStep(floorId, current.x, current.y, x, y) ||
-          isDangerCell(floorId, x, y)
+          !canStep(floorId, current.x, current.y, x, y)
         )
           return;
         const currentRoomId = getRoomId(floorId, current.x, current.y);
@@ -2686,7 +2608,7 @@
       body: `
         <div class="evidence-detail">
           <div class="evidence-detail__image">❄</div>
-          <p>14:36부터 B1 서비스 통로의 온도가 비정상적으로 하락하고 있습니다. 동결체 출몰 가능성이 있으며 운영진은 해당 구역을 위험구역으로 지정할 수 있습니다.</p>
+          <p>14:36부터 B1 서비스 통로의 온도가 비정상적으로 하락하고 있습니다. 동결체 출몰 가능성이 있으므로 해당 구역 이동에 주의가 필요합니다.</p>
           <div class="detail-grid">
             <div><span>발생 위치</span><strong>B1 서비스 통로</strong></div>
             <div><span>확정도</span><strong>유력</strong></div>
@@ -2704,7 +2626,7 @@
     openModal({
       eyebrow: "DEMO DATA",
       title: "시제품 데이터를 초기화할까요?",
-      body: "<p>캐릭터 위치, 행동력, 조사 자료, 상태이상, 위험구역과 운영 로그가 최초 상태로 돌아갑니다.</p>",
+      body: "<p>캐릭터 위치, 행동력, 조사 자료, 상태이상과 운영 로그가 최초 상태로 돌아갑니다.</p>",
       footer: `<button type="button" class="button" data-modal-close>취소</button><button type="button" class="button button--danger" data-confirm-reset>초기화</button>`,
     });
     elements.modalFooter
@@ -2855,10 +2777,6 @@
     );
   }
 
-  function isDangerCell(floorId, x, y) {
-    return state.dangerZones.includes(mapKey(floorId, x, y));
-  }
-
   function edgeKey(x1, y1, x2, y2) {
     const a = `${x1}:${y1}`;
     const b = `${x2}:${y2}`;
@@ -2969,14 +2887,7 @@
           visible: true,
         },
       ],
-      dangerZones: [
-        mapKey("1F", 9, 6),
-        mapKey("1F", 10, 6),
-        mapKey("B1", 9, 6),
-        mapKey("B1", 10, 6),
-      ],
       layers: {
-        danger: true,
         corpseRoute: true,
         entities: true,
       },
@@ -3456,7 +3367,7 @@
           room("breakout_2", "분과발표실 2", 8, 0, 9, 1, "#f7f8f8"),
           room("wc", "화장실", 10, 0, 10, 1, "#f5f0f0"),
           room("stairs", "계단", 11, 0, 11, 1, "#eef1f4"),
-          room("poster_hall", "포스터 전시장", 0, 2, 10, 5, "#edf2f5"),
+          room("poster_hall", "포스터 전시장", 0, 2, 11, 5, "#edf2f5"),
           room("group_1", "조별 토론실 1", 0, 6, 2, 7, "#f7f8f8"),
           room("group_2", "조별 토론실 2", 3, 6, 4, 7, "#f7f8f8"),
           room("print_room", "인쇄실", 5, 6, 6, 7, "#f7f8f8"),
@@ -3529,7 +3440,7 @@
           room("presenter_wait", "발표자 대기실", 7, 0, 9, 1, "#f7f8f8"),
           room("wc", "화장실", 10, 0, 10, 1, "#f5f0f0"),
           room("stairs", "계단", 11, 0, 11, 1, "#eef1f4"),
-          room("archive_hall", "자료열람실", 0, 2, 10, 5, "#edf2f5"),
+          room("archive_hall", "자료열람실", 0, 2, 11, 5, "#edf2f5"),
           room("computer_room", "컴퓨터실", 0, 6, 2, 7, "#f7f8f8"),
           room("project_1", "학생 프로젝트실 1", 3, 6, 5, 7, "#f7f8f8"),
           room("project_2", "학생 프로젝트실 2", 6, 6, 8, 7, "#f7f8f8"),
@@ -3776,13 +3687,11 @@
     records: "조사 기록",
     board: "공동 마인드맵",
     tracking: "추적 기록",
-    investigation: "현재 위치 조사",
   };
 
   const MAP_INFO_LABELS = {
     roomLabels: "공간명",
     burning: "공간 버닝 진행도",
-    danger: "위험구역",
     teamPositions: "그룹 위치 공유",
     warmth: "온기 감지",
   };
@@ -3800,12 +3709,10 @@
         records: true,
         board: role === "survivor",
         tracking: role === "spirit",
-        investigation: true,
       },
       mapInfo: {
         roomLabels: true,
         burning: true,
-        danger: true,
         teamPositions: true,
         warmth: role === "spirit",
       },
@@ -4604,12 +4511,6 @@
           movementActor.y === y
         )
           cellElement.classList.add("is-current");
-        if (
-          state.layers.danger &&
-          (!exposure || exposure.mapInfo.danger) &&
-          isDangerCell(floor.id, x, y)
-        )
-          cellElement.classList.add("is-danger");
         if (getTransitionAt(floor.id, x, y))
           cellElement.classList.add("is-transition");
         const showRoomDetails =
@@ -4650,48 +4551,8 @@
     updateMovementRule(movementActor);
   }
 
-  function appendMapMarkersWithExposure(
-    cellElement,
-    floor,
-    x,
-    y,
-    perspective,
-    exposure,
-  ) {
-    if (state.layers.entities) {
-      const entity = floor.entities.find(
-        (item) => item.x === x && item.y === y,
-      );
-      if (
-        entity &&
-        (perspective.mode === "admin" ||
-          entity.visibleTo.includes(perspective.mode))
-      )
-        cellElement.insertAdjacentHTML(
-          "beforeend",
-          `<span class="map-cell__marker map-cell__marker--entity" title="동결체 출몰">❄</span>`,
-        );
-    }
-    if (state.layers.corpseRoute) {
-      const routePoint = floor.corpseRoute.find(
-        (item) => item.x === x && item.y === y,
-      );
-      if (routePoint && perspective.mode === "admin")
-        cellElement.insertAdjacentHTML(
-          "beforeend",
-          `<span class="map-cell__marker map-cell__marker--corpse" title="시신 이동 경로">${escapeHtml(routePoint.label)}</span>`,
-        );
-    }
-    if (
-      state.layers.danger &&
-      (!exposure || exposure.mapInfo.danger) &&
-      isDangerCell(floor.id, x, y) &&
-      perspective.mode === "admin"
-    )
-      cellElement.insertAdjacentHTML(
-        "beforeend",
-        `<span class="map-cell__marker" title="운영진 지정 위험구역">!</span>`,
-      );
+  function appendMapMarkersWithExposure() {
+    // 지도 위 조사/위험 마커 기능은 사용하지 않습니다.
   }
 
   function handleFloorTabClick(event) {
@@ -5377,11 +5238,9 @@
       ["inventory", "소지품"],
       ["records", "조사 기록"],
       ["tracking", "추적 기록"],
-      ["investigation", "현재 위치 조사"],
     ];
     const infoKeys = [
       ["roomLabels", "공간명"],
-      ["danger", "위험구역"],
       ["teamPositions", "그룹 위치 공유"],
       ["warmth", "온기 감지"],
     ];
@@ -5482,12 +5341,6 @@
           movementActor.y === y
         )
           el.classList.add("is-current");
-        if (
-          state.layers.danger &&
-          (!exposure || exposure.mapInfo.danger) &&
-          isDangerCell(floor.id, x, y)
-        )
-          el.classList.add("is-danger");
         if (getTransitionAt(floor.id, x, y)) el.classList.add("is-transition");
         const details =
           perspective.mode === "admin" || cell.roomId === activeRoomId;
@@ -6353,11 +6206,9 @@
     const featureKeys = [
       ["inventory", "소지품"],
       ["records", "조사 기록"],
-      ["investigation", "현재 위치 조사"],
     ];
     const infoKeys = [
       ["roomLabels", "공간명"],
-      ["danger", "위험구역"],
       ["teamPositions", "그룹 위치 공유"],
       ["warmth", "온기 감지"],
     ];
@@ -6376,25 +6227,8 @@
     elements.rightSidebar.innerHTML = `<div class="sidebar-header"><h2>조사 기록</h2></div><div class="sidebar-body">${available.length ? `<div class="panel-tabs">${available.map(([id, label]) => `<button type="button" class="panel-tab ${ui.rightPanelTab === id ? "is-active" : ""}" data-panel-tab="${id}">${label}</button>`).join("")}</div><div class="panel-content">${playerJournalContent(character, ui.rightPanelTab)}</div>` : emptyStateMarkup("현재 공개된 기록 기능이 없습니다.")}</div>`;
   }
 
-  function appendMapMarkersWithExposure(
-    cellElement,
-    floor,
-    x,
-    y,
-    perspective,
-    exposure,
-  ) {
-    if (
-      state.layers.danger &&
-      (!exposure || exposure.mapInfo.danger) &&
-      isDangerCell(floor.id, x, y) &&
-      perspective.mode === "admin"
-    ) {
-      cellElement.insertAdjacentHTML(
-        "beforeend",
-        `<span class="map-cell__marker" title="운영진 지정 위험구역">!</span>`,
-      );
-    }
+  function appendMapMarkersWithExposure() {
+    // 지도 위 조사/위험 마커 기능은 사용하지 않습니다.
   }
 
   function moveCharacterSetTo(memberIds, floor, x, y) {
@@ -6856,12 +6690,6 @@
           movementActor.y === y
         )
           cellElement.classList.add("is-current");
-        if (
-          perspective.mode === "admin" &&
-          state.layers.danger &&
-          isDangerCell(floor.id, x, y)
-        )
-          cellElement.classList.add("is-danger");
         if (getTransitionAt(floor.id, x, y))
           cellElement.classList.add("is-transition");
         const details =
@@ -6943,7 +6771,6 @@
     const featureKeys = [
       ["inventory", "소지품"],
       ["records", "조사 기록"],
-      ["investigation", "현재 위치 조사"],
     ];
     const infoKeys = [
       ["roomLabels", "공간명"],
@@ -8007,12 +7834,12 @@
         room("research_2f_bio", "생체재료 분석실", 0, 0, 3, 2, "#f4f5f6"),
         room("research_2f_cold", "저온보관실", 4, 0, 6, 2, "#f3f4f5"),
         room("research_2f_clean", "무균실", 7, 0, 9, 2, "#f3f4f5"),
-        room("research_2f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("research_2f_wc_w", "화장실(여)", 10, 0, 10, 2, "#f5f2f2"),
         room("research_2f_stairs", "계단", 11, 0, 11, 2, "#eceff1"),
         room("research_2f_wc_m", "화장실(남)", 11, 3, 11, 4, "#f0f3f5"),
         room("research_2f_elevator", "엘리베이터", 11, 5, 11, 7, "#eceff1"),
         room("research_2f_corridor", "복도", 0, 3, 10, 5, "#e4e7e9"),
-        room("research_2f_precision", "정밀기기실", 0, 6, 5, 7, "#f4f5f6"),
+        room("research_2f_precision", "정밀기기실", 0, 6, 10, 7, "#f4f5f6"),
       ],
       [
         {
@@ -8043,7 +7870,7 @@
         room("research_3f_office", "연구원 사무실", 0, 0, 4, 2, "#f4f5f6"),
         room("research_3f_pi", "책임연구자실", 5, 0, 7, 2, "#f4f5f6"),
         room("research_3f_meeting", "회의실", 8, 0, 9, 2, "#f4f5f6"),
-        room("research_3f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("research_3f_wc_w", "화장실(여)", 10, 0, 10, 2, "#f5f2f2"),
         room("research_3f_stairs", "계단", 11, 0, 11, 2, "#eceff1"),
         room("research_3f_wc_m", "화장실(남)", 11, 3, 11, 4, "#f0f3f5"),
         room("research_3f_elevator", "엘리베이터", 11, 5, 11, 7, "#eceff1"),
@@ -8056,7 +7883,7 @@
           5,
           "#e4e7e9",
         ),
-        room("research_3f_records", "연구기록 보관실", 0, 6, 4, 7, "#f4f5f6"),
+        room("research_3f_records", "연구기록 보관실", 0, 6, 10, 7, "#f4f5f6"),
       ],
       [
         { x: 11, y: 1, type: "stairs", destinations: ["research:2F"] },
@@ -8087,9 +7914,9 @@
           "사고기록 및 명부 대조실",
           3,
           3,
-          7,
+          8,
           4,
-          "#f1e8e8",
+          "#f4f5f6",
         ),
         restrictedRoom("research_b2_fraud", "사기 변환 연구실", 0, 5, 2, 7),
         restrictedRoom("research_b2_comms", "저승 측 통신실", 3, 5, 4, 7),
@@ -8141,20 +7968,21 @@
       {
         id: "research_b3_core_corridor",
         label: "핵심설비 통로",
-        color: "#dedcdc",
+        color: "#e4e7e9",
       },
       [
-        restrictedRoom(
+        room(
           "research_b3_tank",
           "미완성 동결매질 저장탱크",
           0,
           0,
           2,
           1,
+          "#f4f5f6",
         ),
-        restrictedRoom("research_b3_sync", "이승·저승 동기화실", 3, 0, 5, 1),
-        restrictedRoom("research_b3_pressure", "압력조절실", 6, 0, 7, 1),
-        restrictedRoom("research_b3_seal", "자동봉쇄 장치", 8, 0, 9, 1),
+        room("research_b3_sync", "이승·저승 동기화실", 3, 0, 5, 1, "#f4f5f6"),
+        room("research_b3_pressure", "압력조절실", 6, 0, 7, 1, "#f4f5f6"),
+        room("research_b3_seal", "자동봉쇄 장치", 8, 0, 9, 1, "#f4f5f6"),
         room("research_b3_stairs", "보안계단", 10, 0, 10, 1, "#eceff1"),
         room("research_b3_elevator", "전용 승강기", 11, 0, 11, 1, "#eceff1"),
         room(
@@ -8164,12 +7992,13 @@
           2,
           2,
           4,
-          "#dfdddd",
+          "#e4e7e9",
         ),
-        room("research_b3_core", "동결건조 변화기 본체", 3, 2, 8, 4, "#efe7e7"),
-        restrictedRoom("research_b3_emergency", "비상회수 장치", 0, 5, 2, 7),
-        restrictedRoom("research_b3_collect", "오염매질 집수조", 3, 5, 5, 7),
-        restrictedRoom("research_b3_center", "중앙 제어실", 6, 5, 8, 7),
+        room("research_b3_core", "동결건조 변화기 본체", 3, 2, 8, 4, "#f4f5f6"),
+        room("research_b3_passage", "통로", 9, 2, 11, 4, "#e4e7e9"),
+        room("research_b3_emergency", "비상회수 장치", 0, 5, 2, 7, "#f4f5f6"),
+        room("research_b3_collect", "오염매질 집수조", 3, 5, 5, 7, "#f4f5f6"),
+        room("research_b3_center", "중앙 제어실", 6, 5, 9, 7, "#f4f5f6"),
         room("research_b3_stairs_2", "비상계단", 10, 5, 10, 7, "#eceff1"),
         room("research_b3_freight", "화물 승강기", 11, 5, 11, 7, "#eceff1"),
       ],
@@ -8273,6 +8102,16 @@
         room("living_1f_store", "편의매점", 3, 6, 5, 7, "#f4f5f6"),
         room("living_1f_office", "생활관 행정실", 6, 6, 8, 7, "#f4f5f6"),
         room("living_1f_wc_m", "화장실(남)", 9, 6, 9, 7, "#f0f3f5"),
+        room("living_1f_stairs_bottom", "계단", 10, 6, 10, 7, "#eceff1"),
+        room(
+          "living_1f_elevator_bottom",
+          "엘리베이터",
+          11,
+          6,
+          11,
+          7,
+          "#eceff1",
+        ),
       ],
       [
         {
@@ -8287,7 +8126,18 @@
           type: "elevator",
           destinations: ["living:B1", "living:2F", "living:3F", "living:4F"],
         },
-        { x: 0, y: 4, type: "main_link", destinations: ["1F"] },
+        {
+          x: 10,
+          y: 6,
+          type: "stairs",
+          destinations: ["living:B1", "living:2F"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["living:B1", "living:2F", "living:3F", "living:4F"],
+        },
       ],
     );
 
@@ -8441,9 +8291,14 @@
         room("living_406", "406호", 2, 6, 3, 7, "#f4f5f6"),
         room("living_407", "407호", 4, 6, 5, 7, "#f4f5f6"),
         room("living_408", "408호", 6, 6, 7, 7, "#f4f5f6"),
+        room("living_4f_bottom_corridor", "복도", 8, 6, 9, 7, "#e4e7e9"),
         room("living_4f_wc_m", "화장실(남)", 10, 6, 10, 7, "#f0f3f5"),
+        room("living_4f_stairs_bottom", "계단", 11, 6, 11, 7, "#eceff1"),
       ],
-      [{ x: 11, y: 0, type: "stairs", destinations: ["living:3F"] }],
+      [
+        { x: 11, y: 0, type: "stairs", destinations: ["living:3F"] },
+        { x: 11, y: 6, type: "stairs", destinations: ["living:3F"] },
+      ],
     );
 
     return floors;
@@ -8745,8 +8600,6 @@
           movementActor.y === y
         )
           cellElement.classList.add("is-current");
-        if (state.layers.danger && isDangerCell(floor.id, x, y))
-          cellElement.classList.add("is-danger");
         if (getTransitionAt(floor.id, x, y))
           cellElement.classList.add("is-transition");
 
@@ -9208,12 +9061,6 @@
       showToast(
         `${actor.name}을(를) ${getRoomLabel(ui.currentFloor, x, y)}로 이동했습니다.`,
       );
-      return;
-    }
-
-    if (session.type === "admin" && ui.adminTool === "danger") {
-      toggleDangerCell(ui.currentFloor, x, y);
-      renderAll();
       return;
     }
 
