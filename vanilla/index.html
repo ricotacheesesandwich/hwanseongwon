@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="./css/06-feature-overrides.css" />
   </head>
   <body>
-    <noscript>이 사이트는 JavaScript가 필요합니다.</noscript>
+    <noscript>로딩중. 너무 장시간 로딩이 안될시 새로고침을 해주세요.</noscript>
 
     <section
       id="loginView"
@@ -58,43 +58,28 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand__seal" aria-hidden="true">SHU</div>
+          <!-- 여기에 로고 넣어야함 -->
           <div class="brand__copy">
             <strong>생환대학교 부설 학술원 조사 시스템</strong>
             <span>공간 이동 · 팀 위치 공유 · 조사 기록</span>
           </div>
         </div>
 
-        <nav
-          id="viewModeNav"
-          class="view-mode-nav"
-          aria-label="관리자 시점 전환"
-        >
-          <button type="button" data-view-mode="survivor">생환자 시점</button>
-          <button type="button" data-view-mode="spirit">빙혼자 시점</button>
-          <button type="button" data-view-mode="admin" class="is-active">
-            관리자 시점
-          </button>
-        </nav>
-
-        <!-- 상단 중앙: 이벤트와 로그인 정보 -->
         <div class="topbar__center">
           <button
             id="adminOperationsButton"
             type="button"
             class="button button--operations admin-only"
+            aria-label="관리 페이지로 이동"
           >
-            운영페이지
+            관리 페이지
           </button>
-
           <button id="eventButton" type="button" class="event-button">
-            <span aria-hidden="true">!</span>
-            긴급 이벤트 0건
+            <span aria-hidden="true">!</span> 긴급 이벤트 0건
           </button>
-
           <div id="sessionBadge" class="session-badge"></div>
         </div>
 
-        <!-- 상단 오른쪽: 테마 변경과 로그아웃 -->
         <div class="topbar__actions">
           <button
             id="themeToggleButton"
@@ -107,10 +92,9 @@
             <span class="theme-toggle__track" aria-hidden="true">
               <span class="theme-toggle__thumb"></span>
             </span>
-
-            <span id="themeToggleLabel" class="theme-toggle__label">
-              라이트
-            </span>
+            <span id="themeToggleLabel" class="theme-toggle__label"
+              >라이트</span
+            >
           </button>
 
           <button
@@ -130,23 +114,50 @@
 
         <section class="map-panel" aria-labelledby="mapTitle">
           <div class="map-panel__toolbar">
-            <div>
-              <p class="eyebrow">INTERACTIVE FLOOR MAP</p>
-              <h2 id="mapTitle">
-                융합학술동 <span id="currentFloorLabel">1F</span>
-              </h2>
+            <div id="mapViewSection" class="map-view-section admin-only">
+              <nav
+                id="viewModeNav"
+                class="view-mode-nav map-view-mode-nav"
+                aria-label="관리자 시점 전환"
+              >
+                <button type="button" data-view-mode="survivor">
+                  생환자 시점
+                </button>
+                <button type="button" data-view-mode="spirit">
+                  빙혼자 시점
+                </button>
+                <button type="button" data-view-mode="admin" class="is-active">
+                  관리자 시점
+                </button>
+              </nav>
             </div>
 
-            <div id="floorTabs" class="floor-tabs" aria-label="층 선택"></div>
+            <div class="map-detail-bar">
+              <div class="map-panel__title">
+                <p id="mapEyebrow" class="eyebrow">학술원 부지 지도</p>
+                <h2 id="mapTitle">
+                  융합학술동 <span id="currentFloorLabel">1F</span>
+                </h2>
+              </div>
 
-            <div class="map-toolbar-actions">
-              <button
-                id="investigateButton"
-                type="button"
-                class="button button--soft"
-              >
-                현재 위치 조사
-              </button>
+              <div class="map-floor-section">
+                <div
+                  id="floorTabs"
+                  class="floor-tabs"
+                  aria-label="층 선택"
+                ></div>
+              </div>
+
+              <div class="map-detail-bar__actions">
+                <button
+                  id="siteMapButton"
+                  type="button"
+                  class="button button--map"
+                  aria-label="학술원 전체 지도로 이동"
+                >
+                  지도
+                </button>
+              </div>
             </div>
           </div>
 
@@ -197,6 +208,44 @@
         aria-labelledby="operationsPageTitle"
       >
         <div id="adminOperationsContent"></div>
+      </section>
+    </div>
+
+    <div
+      id="campusMapBackdrop"
+      class="campus-map-backdrop is-hidden"
+      aria-hidden="true"
+    >
+      <section
+        id="campusMapPopup"
+        class="campus-map-popup"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="campusMapPopupTitle"
+      >
+        <header class="campus-map-popup__header">
+          <div>
+            <p class="eyebrow">CAMPUS MAP</p>
+            <h2 id="campusMapPopupTitle">학술원 전체 지도</h2>
+            <p>건물을 선택하면 해당 건물의 층별 상세 지도로 이동합니다.</p>
+          </div>
+          <button
+            id="campusMapCloseButton"
+            type="button"
+            class="icon-button"
+            aria-label="전체 지도 닫기"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="campus-map-popup__body">
+          <div
+            id="campusMapCanvas"
+            class="campus-site-map"
+            aria-label="학술원 전체 부지 지도"
+          ></div>
+        </div>
       </section>
     </div>
 

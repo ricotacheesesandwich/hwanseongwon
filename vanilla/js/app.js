@@ -5,6 +5,28 @@
   const THEME_STORAGE_PREFIX = "shu-account-theme";
   const DEFAULT_THEME_MODE = "light";
   const FLOOR_ORDER = ["B1", "1F", "2F", "3F", "4F"];
+  const EXPOSURE_FLOOR_OPTIONS = [
+    { key: "B1", label: "융합학술동 B1", building: "융합학술동" },
+    { key: "1F", label: "융합학술동 1F", building: "융합학술동" },
+    { key: "2F", label: "융합학술동 2F", building: "융합학술동" },
+    { key: "3F", label: "융합학술동 3F", building: "융합학술동" },
+    { key: "4F", label: "융합학술동 4F", building: "융합학술동" },
+
+    { key: "living:B1", label: "생활관 B1", building: "생활관" },
+    { key: "living:1F", label: "생활관 1F", building: "생활관" },
+    { key: "living:2F", label: "생활관 2F", building: "생활관" },
+    { key: "living:3F", label: "생활관 3F", building: "생활관" },
+    { key: "living:4F", label: "생활관 4F", building: "생활관" },
+
+    { key: "research:B3", label: "연구별관 B3", building: "연구별관" },
+    { key: "research:B2", label: "연구별관 B2", building: "연구별관" },
+    { key: "research:B1", label: "연구별관 B1", building: "연구별관" },
+    { key: "research:1F", label: "연구별관 1F", building: "연구별관" },
+    { key: "research:2F", label: "연구별관 2F", building: "연구별관" },
+    { key: "research:3F", label: "연구별관 3F", building: "연구별관" },
+
+    { key: "support:1F", label: "관리지원동 1F", building: "관리지원동" },
+  ];
   const GRID_COLUMNS = 12;
   const GRID_ROWS = 8;
 
@@ -57,6 +79,9 @@
   };
 
   const FLOOR_DEFINITIONS = createFloorDefinitions();
+  const BUILDING_DEFINITIONS = createBuildingDefinitions();
+  Object.assign(FLOOR_DEFINITIONS, createAdditionalFloorDefinitions());
+  installCrossBuildingTransitions();
 
   const storage = createStorageAdapter();
   const syncChannel =
@@ -68,6 +93,8 @@
   let state = ensureFeatureState(loadState());
   let ui = {
     currentFloor: "1F",
+    currentBuilding: "main",
+    mapMode: "floor",
     selectedCharacterId: 104,
     viewMode: "admin",
     themeMode: DEFAULT_THEME_MODE,
@@ -106,7 +133,15 @@
     elements.themeToggleButton = document.querySelector("#themeToggleButton");
     elements.themeToggleLabel = document.querySelector("#themeToggleLabel");
     elements.viewModeNav = document.querySelector("#viewModeNav");
+    elements.mapViewSection = document.querySelector("#mapViewSection");
     elements.eventButton = document.querySelector("#eventButton");
+    elements.siteMapButton = document.querySelector("#siteMapButton");
+    elements.campusMapBackdrop = document.querySelector("#campusMapBackdrop");
+    elements.campusMapPopup = document.querySelector("#campusMapPopup");
+    elements.campusMapCanvas = document.querySelector("#campusMapCanvas");
+    elements.campusMapCloseButton = document.querySelector(
+      "#campusMapCloseButton",
+    );
     elements.adminOperationsButton = document.querySelector(
       "#adminOperationsButton",
     );
@@ -119,11 +154,11 @@
     elements.leftSidebar = document.querySelector("#leftSidebar");
     elements.rightSidebar = document.querySelector("#rightSidebar");
     elements.floorTabs = document.querySelector("#floorTabs");
+    elements.mapEyebrow = document.querySelector("#mapEyebrow");
     elements.currentFloorLabel = document.querySelector("#currentFloorLabel");
     elements.mapGrid = document.querySelector("#mapGrid");
     elements.mapToast = document.querySelector("#mapToast");
     elements.warmthBanner = document.querySelector("#warmthBanner");
-    elements.investigateButton = document.querySelector("#investigateButton");
     elements.adminManageButton = document.querySelector("#adminManageButton");
     elements.compareViewsButton = document.querySelector("#compareViewsButton");
     elements.selectedCharacterSummary = document.querySelector(
@@ -184,10 +219,6 @@
     elements.viewModeNav.addEventListener("click", handleViewModeClick);
     elements.floorTabs.addEventListener("click", handleFloorTabClick);
     elements.mapGrid.addEventListener("click", handleMapClick);
-    elements.investigateButton.addEventListener(
-      "click",
-      handleInvestigateCurrent,
-    );
     elements.adminManageButton?.addEventListener("click", () =>
       showAdminHubModal(ui.adminModalTab),
     );
@@ -290,8 +321,9 @@
     session = { type: "player", characterId: character.id };
     ui.themeMode = loadAccountTheme();
     ui.selectedCharacterId = character.id;
-    ui.selectedCharacterId = character.id;
     ui.currentFloor = character.floor;
+    ui.currentBuilding = buildingFromFloorKey(character.floor);
+    ui.mapMode = "floor";
     ui.viewMode = character.role;
     ui.adminTool = null;
     ui.rightPanelTab = "inventory";
@@ -304,11 +336,12 @@
   function loginAsAdmin() {
     session = { type: "admin" };
     ui.themeMode = loadAccountTheme();
-
     const selected =
       getCharacter(ui.selectedCharacterId) || state.characters[0];
     ui.selectedCharacterId = selected.id;
     ui.currentFloor = selected.floor;
+    ui.currentBuilding = buildingFromFloorKey(selected.floor);
+    ui.mapMode = "floor";
     ui.viewMode = "admin";
     ui.adminTool = null;
     ui.rightPanelTab = "manage";
@@ -326,9 +359,7 @@
 
   function showLogin() {
     session = null;
-
     clearAccountThemeClasses();
-
     document.body.classList.add("login-theme");
     document.documentElement.style.colorScheme = "light";
 
@@ -348,10 +379,7 @@
     ui.pendingLogin = null;
 
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-
-    if (themeMeta) {
-      themeMeta.setAttribute("content", "#0c2744");
-    }
+    if (themeMeta) themeMeta.setAttribute("content", "#0c2744");
   }
 
   function openApp() {
@@ -372,10 +400,23 @@
       "is-hidden",
       !isAdmin || ui.operationsOpen,
     );
+    elements.mapViewSection?.classList.toggle(
+      "is-hidden",
+      !isAdmin || ui.operationsOpen,
+    );
     elements.adminOperationsButton.classList.toggle(
       "is-active",
       isAdmin && ui.operationsOpen,
     );
+    if (elements.adminOperationsButton) {
+      elements.adminOperationsButton.textContent = ui.operationsOpen
+        ? "지도 페이지"
+        : "관리 페이지";
+      elements.adminOperationsButton.setAttribute(
+        "aria-label",
+        ui.operationsOpen ? "지도 페이지로 이동" : "관리 페이지로 이동",
+      );
+    }
     elements.workspace.classList.toggle("workspace--admin", isAdmin);
     elements.workspace.classList.toggle(
       "is-hidden",
@@ -399,19 +440,15 @@
     renderMap();
     renderSelectedSummary();
     renderEventButton();
-    updateInvestigationButton();
   }
 
   function applySessionTheme() {
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     const accountType = getCurrentAccountType();
     const themeMode = ui.themeMode === "dark" ? "dark" : "light";
 
     clearAccountThemeClasses();
-
     document.body.classList.remove("login-theme");
     document.body.classList.add(`theme-${accountType}`);
     document.body.classList.add(`theme-mode-${themeMode}`);
@@ -423,16 +460,13 @@
       "theme-mode--light",
       "theme-mode--dark",
     );
-
     elements.appView?.classList.add(`app-shell--${accountType}`);
     elements.appView?.classList.add(`theme-mode--${themeMode}`);
 
     document.documentElement.style.colorScheme = themeMode;
-
     updateThemeToggleButton();
 
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-
     if (themeMeta) {
       themeMeta.setAttribute(
         "content",
@@ -442,46 +476,29 @@
   }
 
   function getCurrentAccountType() {
-    if (session?.type === "admin") {
-      return "admin";
-    }
-
+    if (session?.type === "admin") return "admin";
     if (session?.type === "player") {
-      const character = getCharacter(session.characterId);
-
-      if (character?.role === "spirit") {
-        return "spirit";
-      }
-
-      return "survivor";
+      return getCharacter(session.characterId)?.role === "spirit"
+        ? "spirit"
+        : "survivor";
     }
-
     return "admin";
   }
 
   function getCurrentThemeStorageKey() {
-    if (session?.type === "admin") {
-      return `${THEME_STORAGE_PREFIX}:admin`;
-    }
-
+    if (session?.type === "admin") return `${THEME_STORAGE_PREFIX}:admin`;
     if (session?.type === "player") {
       return `${THEME_STORAGE_PREFIX}:character:${session.characterId}`;
     }
-
     return null;
   }
 
   function loadAccountTheme() {
     const storageKey = getCurrentThemeStorageKey();
-
-    if (!storageKey) {
-      return DEFAULT_THEME_MODE;
-    }
+    if (!storageKey) return DEFAULT_THEME_MODE;
 
     try {
-      const storedTheme = localStorage.getItem(storageKey);
-
-      return storedTheme === "dark" ? "dark" : "light";
+      return localStorage.getItem(storageKey) === "dark" ? "dark" : "light";
     } catch (error) {
       console.warn("계정 테마를 불러오지 못했습니다.", error);
       return DEFAULT_THEME_MODE;
@@ -490,10 +507,7 @@
 
   function saveAccountTheme(themeMode) {
     const storageKey = getCurrentThemeStorageKey();
-
-    if (!storageKey) {
-      return;
-    }
+    if (!storageKey) return;
 
     try {
       localStorage.setItem(storageKey, themeMode);
@@ -503,26 +517,18 @@
   }
 
   function toggleThemeMode() {
-    if (!session) {
-      return;
-    }
-
+    if (!session) return;
     ui.themeMode = ui.themeMode === "dark" ? "light" : "dark";
-
     saveAccountTheme(ui.themeMode);
     applySessionTheme();
   }
 
   function updateThemeToggleButton() {
-    if (!elements.themeToggleButton) {
-      return;
-    }
-
+    if (!elements.themeToggleButton) return;
     const isDarkMode = ui.themeMode === "dark";
 
     elements.themeToggleButton.classList.toggle("is-dark", isDarkMode);
     elements.themeToggleButton.setAttribute("aria-checked", String(isDarkMode));
-
     elements.themeToggleButton.setAttribute(
       "aria-label",
       isDarkMode ? "라이트모드로 전환" : "다크모드로 전환",
@@ -547,20 +553,10 @@
 
   function getThemeMetaColor(accountType, themeMode) {
     const themeColors = {
-      admin: {
-        light: "#65bce8",
-        dark: "#063b52",
-      },
-      spirit: {
-        light: "#7b1f36",
-        dark: "#12080b",
-      },
-      survivor: {
-        light: "#112f55",
-        dark: "#07182d",
-      },
+      admin: { light: "#65bce8", dark: "#063b52" },
+      spirit: { light: "#7b1f36", dark: "#12080b" },
+      survivor: { light: "#112f55", dark: "#07182d" },
     };
-
     return themeColors[accountType]?.[themeMode] || "#0c2744";
   }
 
@@ -684,11 +680,6 @@
           </div>
           <div class="compact-team-list">${teamCards}</div>
         </section>
-
-        <div class="side-note">
-          <strong>지도에서 팀 데려오기</strong>
-          <p>지도 위치를 클릭한 뒤 이동시킬 팀을 선택하면 해당 팀원 전원이 같은 공간으로 이동합니다. 개인 이동은 캐릭터 관리창에서 지정합니다.</p>
-        </div>
       </div>
     `;
   }
@@ -740,7 +731,7 @@
                     (member) => `
                   <div class="team-member-row">
                     ${avatarMarkup(member, true)}
-                    <span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${member.floor} · ${escapeHtml(getRoomLabel(member.floor, member.x, member.y))}</small></span>
+                    <span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${escapeHtml(characterLocationText(member))}</small></span>
                   </div>`,
                   )
                   .join("")}
@@ -773,7 +764,7 @@
           </div>
         </div>
         <div class="stat-grid">
-          <div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</strong></div>
+          <div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>
           ${movementCard}
         </div>
         ${apMeter}
@@ -1635,20 +1626,6 @@
     container.innerHTML = html;
   }
 
-  function updateInvestigationButton() {
-    const actor = getMovementActor();
-    const investigation = getInvestigationAt(actor.floor, actor.x, actor.y);
-    elements.investigateButton.disabled =
-      !investigation || actor.floor !== ui.currentFloor;
-    if (!investigation) {
-      elements.investigateButton.textContent = "현재 위치 조사";
-    } else if (actor.investigations.includes(investigation.id)) {
-      elements.investigateButton.textContent = "조사 기록 보기";
-    } else {
-      elements.investigateButton.textContent = "조사하기 · 행동력 미소모";
-    }
-  }
-
   function updateMovementRule(actor) {
     const visibleTeams = getVisibleTeamsForCharacter(actor.id);
     const sharedText = visibleTeams.length
@@ -1782,6 +1759,8 @@
       if (character) {
         ui.selectedCharacterId = character.id;
         ui.currentFloor = character.floor;
+        ui.currentBuilding = buildingFromFloorKey(character.floor);
+        ui.mapMode = "floor";
         renderAll();
         showCharacterManagementModal(character.id);
       }
@@ -1854,8 +1833,6 @@
     }
 
     if (actor.x === x && actor.y === y) {
-      const investigation = getInvestigationAt(actor.floor, x, y);
-      if (investigation) handleInvestigateCurrent();
       return;
     }
 
@@ -2020,56 +1997,6 @@
         ? "같은 공간 안에서 이동했습니다."
         : `행동력 ${cost}을 사용해 이동했습니다.`,
     );
-  }
-
-  function handleInvestigateCurrent() {
-    const actor = getMovementActor();
-    if (actor.floor !== ui.currentFloor) {
-      showToast("캐릭터가 있는 층에서 조사해 주세요.");
-      return;
-    }
-
-    const investigation = getInvestigationAt(actor.floor, actor.x, actor.y);
-    if (!investigation) {
-      showToast("현재 위치에는 조사 가능한 대상이 없습니다.");
-      return;
-    }
-
-    if (actor.investigations.includes(investigation.id)) {
-      const evidence = actor.inventory.find(
-        (item) => item.sourceId === investigation.id,
-      );
-      showEvidenceModal(evidence, investigation);
-      return;
-    }
-
-    openModal({
-      eyebrow: `${actor.floor} · ${getRoomLabel(actor.floor, actor.x, actor.y)}`,
-      title: investigation.title,
-      body: `
-        <div class="evidence-detail">
-          <div class="evidence-detail__image">⌕</div>
-          <p>${escapeHtml(investigation.prompt)}</p>
-          <div class="detail-grid">
-            <div><span>행동력</span><strong>미소모</strong></div>
-            <div><span>획득 자료</span><strong>${escapeHtml(investigation.evidenceTitle)}</strong></div>
-          </div>
-        </div>
-      `,
-      footer: `
-        <button type="button" class="button" data-modal-close>취소</button>
-        <button type="button" class="button button--primary" data-confirm-investigation="${investigation.id}">조사하기</button>
-      `,
-    });
-
-    elements.modalFooter
-      .querySelector("[data-modal-close]")
-      ?.addEventListener("click", closeModal);
-    elements.modalFooter
-      .querySelector("[data-confirm-investigation]")
-      ?.addEventListener("click", () =>
-        completeInvestigation(actor, investigation),
-      );
   }
 
   function completeInvestigation(actor, investigation) {
@@ -3354,6 +3281,7 @@
         rooms: [
           room("event_storage", "행사 물품창고", 0, 0, 2, 1, "#f7f7f5"),
           room("document_archive", "문서보관실", 3, 0, 5, 1, "#f6f7f8"),
+          room("b1_upper_corridor", "지하 연결 복도", 6, 0, 9, 1, "#e9edf0"),
           room("stairs", "계단", 10, 0, 10, 1, "#edf1f4"),
           room("elevator", "엘리베이터", 11, 0, 11, 1, "#edf1f4"),
           room("b1_corridor", "지하 공용 복도", 0, 2, 11, 4, "#e9edf0"),
@@ -3862,9 +3790,9 @@
   function defaultRoleExposure(role) {
     return {
       floors: Object.fromEntries(
-        FLOOR_ORDER.map((floor) => [
-          floor,
-          role === "survivor" ? ["1F", "2F"].includes(floor) : true,
+        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [
+          key,
+          role === "survivor" ? ["1F", "2F"].includes(key) : true,
         ]),
       ),
       features: {
@@ -3973,7 +3901,7 @@
           <h1 id="operationsPageTitle">운영진 통합 운영페이지</h1>
           <p>인원·자료 보관함·공간 진행도·공동 마인드맵·긴급 이벤트·노출 정보를 한곳에서 관리합니다.</p>
         </div>
-        <button type="button" class="button" data-close-operations>지도 화면으로 돌아가기</button>
+        
       </div>
       <nav class="operations-tabs" aria-label="운영페이지 메뉴">${tabButtons}</nav>
       <div class="operations-content">${operationsTabContent(ui.operationsTab)}</div>
@@ -4228,10 +4156,6 @@
 
   function handleOperationsClick(event) {
     if (session?.type !== "admin") return;
-    if (event.target.closest("[data-close-operations]")) {
-      closeAdminOperationsPage();
-      return;
-    }
     const tab = event.target.closest("[data-operations-tab]");
     if (tab) {
       ui.operationsTab = tab.dataset.operationsTab;
@@ -4595,23 +4519,6 @@
       <div class="sidebar-body">
         ${tabs.length ? `<div class="panel-tabs">${tabs.map(([id, label]) => `<button type="button" class="panel-tab ${ui.rightPanelTab === id ? "is-active" : ""}" data-panel-tab="${id}">${label}</button>`).join("")}</div><div class="panel-content">${playerJournalContent(character, ui.rightPanelTab)}</div>` : emptyStateMarkup("현재 공개된 기록 기능이 없습니다.")}
       </div>`;
-  }
-
-  function updateInvestigationButton() {
-    const actor = getMovementActor();
-    const exposed =
-      session.type !== "player" ||
-      getRoleExposure(actor.role).features.investigation;
-    elements.investigateButton.classList.toggle("is-hidden", !exposed);
-    if (!exposed) return;
-    const investigation = getInvestigationAt(actor.floor, actor.x, actor.y);
-    elements.investigateButton.disabled =
-      !investigation || actor.floor !== ui.currentFloor;
-    if (!investigation)
-      elements.investigateButton.textContent = "현재 위치 조사";
-    else if (actor.investigations.includes(investigation.id))
-      elements.investigateButton.textContent = "조사 기록 보기";
-    else elements.investigateButton.textContent = "조사하기 · 행동력 미소모";
   }
 
   function renderMap() {
@@ -5248,9 +5155,9 @@
   function defaultRoleExposure(role) {
     return {
       floors: Object.fromEntries(
-        FLOOR_ORDER.map((floor) => [
-          floor,
-          role === "survivor" ? ["1F", "2F"].includes(floor) : true,
+        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [
+          key,
+          role === "survivor" ? ["1F", "2F"].includes(key) : true,
         ]),
       ),
       features: {
@@ -5373,7 +5280,7 @@
           `<button type="button" class="operations-tab ${ui.operationsTab === id ? "is-active" : ""}" data-operations-tab="${id}">${label}</button>`,
       )
       .join("");
-    elements.adminOperationsContent.innerHTML = `<div class="operations-page__header"><div><p class="eyebrow">OPERATIONS CENTER</p><h1>운영진 통합 운영페이지</h1><p>인원·자료·빙혼 시간·공간 진행·이동 기록·긴급 이벤트를 관리합니다.</p></div><button type="button" class="button" data-close-operations>지도 화면으로 돌아가기</button></div><nav class="operations-tabs">${tabButtons}</nav><div class="operations-content">${operationsTabContent(ui.operationsTab)}</div><div class="operations-toast is-hidden" role="status"></div>`;
+    elements.adminOperationsContent.innerHTML = `<div class="operations-page__header"><div><p class="eyebrow">OPERATIONS CENTER</p><h1>운영진 통합 운영페이지</h1><p>인원·자료·빙혼 시간·공간 진행·이동 기록·긴급 이벤트를 관리합니다.</p></div></div><nav class="operations-tabs">${tabButtons}</nav><div class="operations-content">${operationsTabContent(ui.operationsTab)}</div><div class="operations-toast is-hidden" role="status"></div>`;
   }
   function operationsTabContent(tab) {
     if (tab === "inventory") return inventoryOperationsMarkup();
@@ -5719,8 +5626,7 @@
 
   function handleOperationsClick(event) {
     if (session?.type !== "admin") return;
-    if (event.target.closest("[data-close-operations]"))
-      return closeAdminOperationsPage();
+
     const tab = event.target.closest("[data-operations-tab]");
     if (tab) {
       ui.operationsTab = tab.dataset.operationsTab;
@@ -6011,9 +5917,9 @@
   function defaultRoleExposure(role) {
     return {
       floors: Object.fromEntries(
-        FLOOR_ORDER.map((floor) => [
-          floor,
-          role === "survivor" ? ["1F", "2F"].includes(floor) : true,
+        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [
+          key,
+          role === "survivor" ? ["1F", "2F"].includes(key) : true,
         ]),
       ),
       features: { inventory: true, records: true, investigation: true },
@@ -6254,7 +6160,7 @@
       <div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div>
       <div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div>
       <section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section>
-      <div class="side-note"><strong>지도에서 팀 데려오기</strong><p>지도 위치를 클릭한 뒤 이동시킬 팀을 선택하면 해당 팀원 전원이 같은 공간으로 이동합니다. 개인 이동은 캐릭터 관리창에서 지정합니다.</p></div>
+      
     </div>`;
   }
 
@@ -6290,7 +6196,7 @@
           .map((team) => {
             const members = team.memberIds.map(getCharacter).filter(Boolean);
             const visible = team.visible !== false;
-            return `<article class="team-summary-card ${visible ? "" : "is-visibility-off"}" style="--team-color:${team.color}"><div class="team-summary-card__head"><strong>${escapeHtml(team.name)}</strong><span>${visible ? "위치 공유 중" : "위치 공유 꺼짐"}</span></div><div class="team-member-list">${members.map((member) => `<div class="team-member-row">${avatarMarkup(member, true)}<span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${member.floor} · ${escapeHtml(getRoomLabel(member.floor, member.x, member.y))}</small></span></div>`).join("")}</div></article>`;
+            return `<article class="team-summary-card ${visible ? "" : "is-visibility-off"}" style="--team-color:${team.color}"><div class="team-summary-card__head"><strong>${escapeHtml(team.name)}</strong><span>${visible ? "위치 공유 중" : "위치 공유 꺼짐"}</span></div><div class="team-member-list">${members.map((member) => `<div class="team-member-row">${avatarMarkup(member, true)}<span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${escapeHtml(characterLocationText(member))}</small></span></div>`).join("")}</div></article>`;
           })
           .join("")
       : emptyStateMarkup("현재 편성된 팀이 없습니다.");
@@ -6304,7 +6210,7 @@
       : `<span class="shared-member-chip is-muted">원격 위치 공유 중인 팀원 없음</span>`;
     elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div>
       <div class="infection-summary-card"><div class="infection-summary-card__top"><span>감염 잔여 시간</span><strong class="infection-summary-card__time" data-infection-clock="${character.id}">${infectionClockText(character)}</strong></div><div class="infection-summary-card__meta"><span data-infection-stage="${character.id}">${freezeStageLabel(freezeStage(effectiveFreezeHours(character)))}</span><span class="infection-multiplier-chip" data-infection-multiplier="${character.id}">×${clockMultiplier(character).toFixed(1)}</span></div></div>
-      <div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</strong></div>${movementCard}</div>${apMeter}
+      <div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}
       <section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section>
       <section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list">${statuses}</div></section>
       <div class="side-note"><strong>${character.role === "spirit" ? "빙혼자 이동" : "생환자 위치"}</strong><p>${character.role === "spirit" ? "다른 공간으로 이동할 때 행동력 1이 차감됩니다. 이동 전 소모 행동력을 확인하는 창이 표시됩니다." : "자신의 위치는 직접 바꿀 수 없으며 운영진이 이동시킵니다."} 빙혼자는 같은 공간의 생환자 신원 대신 온기와 인원수만 감지합니다.</p></div>
@@ -6388,7 +6294,7 @@
           `<button type="button" class="operations-tab ${ui.operationsTab === id ? "is-active" : ""}" data-operations-tab="${id}">${label}</button>`,
       )
       .join("");
-    elements.adminOperationsContent.innerHTML = `<div class="operations-page__header"><div><p class="eyebrow">OPERATIONS CENTER</p><h1>운영진 통합 운영페이지</h1><p>인원·자료·모든 캐릭터 감염 시간·공간 진행·빙혼 이동 기록·긴급 이벤트를 관리합니다.</p></div><button type="button" class="button" data-close-operations>지도 화면으로 돌아가기</button></div><nav class="operations-tabs">${tabButtons}</nav><div class="operations-content">${operationsTabContent(ui.operationsTab)}</div><div class="operations-toast is-hidden" role="status"></div>`;
+    elements.adminOperationsContent.innerHTML = `<div class="operations-page__header"><div><p class="eyebrow">OPERATIONS CENTER</p><h1>운영진 통합 운영페이지</h1><p>인원·자료·모든 캐릭터 감염 시간·공간 진행·빙혼 이동 기록·긴급 이벤트를 관리합니다.</p></div></div><nav class="operations-tabs">${tabButtons}</nav><div class="operations-content">${operationsTabContent(ui.operationsTab)}</div><div class="operations-toast is-hidden" role="status"></div>`;
   }
 
   function combinedRosterMarkup(characters) {
@@ -6564,9 +6470,9 @@
   function defaultRoleExposure(role) {
     return {
       floors: Object.fromEntries(
-        FLOOR_ORDER.map((floor) => [
-          floor,
-          role === "survivor" ? ["1F", "2F"].includes(floor) : true,
+        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [
+          key,
+          role === "survivor" ? ["1F", "2F"].includes(key) : true,
         ]),
       ),
       features: { inventory: true, records: true, investigation: true },
@@ -7006,9 +6912,34 @@
 
   function roleSettingsMarkup(role) {
     const exposure = getRoleExposure(role);
-    const floors = FLOOR_ORDER.map((floor) =>
-      settingToggleMarkup(role, "floors", floor, floor, exposure.floors[floor]),
-    ).join("");
+
+    const buildingOrder = ["융합학술동", "생활관", "연구별관", "관리지원동"];
+    const floorGroups = buildingOrder
+      .map((building) => {
+        const toggles = EXPOSURE_FLOOR_OPTIONS.filter(
+          (item) => item.building === building,
+        )
+          .map((item) =>
+            settingToggleMarkup(
+              role,
+              "floors",
+              item.key,
+              item.label.replace(`${building} `, ""),
+              exposure.floors[item.key] !== false,
+            ),
+          )
+          .join("");
+
+        return `
+        <div class="settings-floor-group">
+          <h4>${building}</h4>
+          <div class="settings-toggle-grid settings-toggle-grid--floors">
+            ${toggles}
+          </div>
+        </div>`;
+      })
+      .join("");
+
     const featureKeys = [
       ["inventory", "소지품"],
       ["records", "조사 기록"],
@@ -7019,9 +6950,37 @@
       ["teamPositions", "그룹 위치 공유"],
       ["warmth", "온기 감지"],
     ];
-    return `<section class="operations-card role-settings-card role-settings-card--${role}"><header><div><p class="eyebrow">${role.toUpperCase()} EXPOSURE</p><h2>${ROLE_LABELS[role]} 화면 설정</h2></div>${roleChipMarkup(role)}</header><div class="settings-section"><h3>노출 층</h3><div class="settings-toggle-grid settings-toggle-grid--floors">${floors}</div></div><div class="settings-section"><h3>노출 기능</h3><div class="settings-toggle-grid">${featureKeys.map(([key, label]) => settingToggleMarkup(role, "features", key, label, exposure.features[key])).join("")}</div></div><div class="settings-section"><h3>지도 정보</h3><div class="settings-toggle-grid">${infoKeys.map(([key, label]) => settingToggleMarkup(role, "mapInfo", key, label, exposure.mapInfo[key])).join("")}</div></div><p class="form-help">위험구역과 공간 시간 배율은 플레이어에게 공개되지 않으며 관리자 지도에서만 표시됩니다.</p></section>`;
-  }
 
+    return `
+      <section class="operations-card role-settings-card role-settings-card--${role}">
+        <header>
+          <div>
+            <p class="eyebrow">${role.toUpperCase()} EXPOSURE</p>
+            <h2>${ROLE_LABELS[role]} 화면 설정</h2>
+          </div>
+          ${roleChipMarkup(role)}
+        </header>
+
+        <div class="settings-section">
+          <h3>노출 층</h3>
+          <div class="settings-floor-groups">${floorGroups}</div>
+        </div>
+
+        <div class="settings-section">
+          <h3>노출 기능</h3>
+          <div class="settings-toggle-grid">
+            ${featureKeys.map(([key, label]) => settingToggleMarkup(role, "features", key, label, exposure.features[key])).join("")}
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>지도 정보</h3>
+          <div class="settings-toggle-grid">
+            ${infoKeys.map(([key, label]) => settingToggleMarkup(role, "mapInfo", key, label, exposure.mapInfo[key])).join("")}
+          </div>
+        </div>
+      </section>`;
+  }
   function renderAdminRoster() {
     const filter = ui.adminRosterFilter || "all";
     ui.adminRosterFilter = filter;
@@ -7065,7 +7024,7 @@
           .join("")
       : `<div class="compact-empty">편성된 팀이 없습니다.</div>`;
 
-    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body"><div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div><div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div><section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section><div class="side-note"><strong>지도에서 팀 데려오기</strong><p>지도 위치를 클릭한 뒤 이동시킬 팀을 선택하면 해당 팀원 전원이 같은 공간으로 이동합니다. 개인 이동은 캐릭터의 관리 버튼에서 지정합니다.</p></div></div>`;
+    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body"><div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div><div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div><section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section></div>`;
   }
 
   function renderPlayerProfile() {
@@ -7102,7 +7061,7 @@
               .map(getCharacter)
               .filter((member) => member && member.role === character.role);
             const visible = team.visible !== false;
-            return `<article class="team-summary-card ${visible ? "" : "is-visibility-off"}" style="--team-color:${team.color}"><div class="team-summary-card__head"><strong>${escapeHtml(team.name)}</strong><span>${visible ? "위치 공유 중" : "위치 공유 꺼짐"}</span></div><div class="team-member-list">${members.length ? members.map((member) => `<div class="team-member-row">${avatarMarkup(member, true)}<span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${member.floor} · ${escapeHtml(getRoomLabel(member.floor, member.x, member.y))}</small></span></div>`).join("") : `<span class="muted-text">같은 분류의 공개 팀원이 없습니다.</span>`}</div></article>`;
+            return `<article class="team-summary-card ${visible ? "" : "is-visibility-off"}" style="--team-color:${team.color}"><div class="team-summary-card__head"><strong>${escapeHtml(team.name)}</strong><span>${visible ? "위치 공유 중" : "위치 공유 꺼짐"}</span></div><div class="team-member-list">${members.length ? members.map((member) => `<div class="team-member-row">${avatarMarkup(member, true)}<span><strong>${escapeHtml(member.name)} · ${member.id}</strong><small>${escapeHtml(characterLocationText(member))}</small></span></div>`).join("") : `<span class="muted-text">같은 분류의 공개 팀원이 없습니다.</span>`}</div></article>`;
           })
           .join("")
       : emptyStateMarkup("현재 편성된 팀이 없습니다.");
@@ -7118,7 +7077,7 @@
       character.role === "spirit"
         ? `<div class="side-note"><strong>빙혼자 이동</strong><p>다른 공간으로 이동할 때 행동력 1이 차감됩니다. 같은 공간의 생환자는 신원 대신 온기와 인원수로만 감지합니다.</p></div>`
         : "";
-    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list">${statuses}</div></section>${spiritGuide}</div>`;
+    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list">${statuses}</div></section>${spiritGuide}</div>`;
   }
 
   function renderSelectedSummary() {
@@ -7290,14 +7249,16 @@
     const db = await openMediaDbV3();
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(MEDIA_STORE_NAME_V3, "readwrite");
-      transaction.objectStore(MEDIA_STORE_NAME_V3).put({
-        key,
-        blob: file,
-        name,
-        type: file.type || "application/octet-stream",
-        size: file.size,
-        createdAt: new Date().toISOString(),
-      });
+      transaction
+        .objectStore(MEDIA_STORE_NAME_V3)
+        .put({
+          key,
+          blob: file,
+          name,
+          type: file.type || "application/octet-stream",
+          size: file.size,
+          createdAt: new Date().toISOString(),
+        });
       transaction.oncomplete = resolve;
       transaction.onerror = () => reject(transaction.error);
     });
@@ -7796,4 +7757,1566 @@
     }
   }, 0);
   window.setInterval(refreshLiveInfectionClocks, 1000);
+
+  /* =====================================================================
+     학술원 전체 부지 지도 + 건물별 층 지도
+     ===================================================================== */
+
+  let campusMapRenderSignature = "";
+
+  function createBuildingDefinitions() {
+    return {
+      main: {
+        id: "main",
+        name: "융합학술동",
+        short: "학술동",
+        description: "심포지엄 본관 · 로비 · 대강당 · 연구/운영 공간",
+        floors: ["B1", "1F", "2F", "3F", "4F"],
+        className: "campus-building--main",
+      },
+      living: {
+        id: "living",
+        name: "생활관",
+        short: "생활관",
+        description: "숙박 · 학생식당 · 편의시설",
+        floors: [
+          "living:B1",
+          "living:1F",
+          "living:2F",
+          "living:3F",
+          "living:4F",
+        ],
+        className: "campus-building--living",
+      },
+      research: {
+        id: "research",
+        name: "연구별관",
+        short: "연구별관",
+        description: "재난 · 의료 · 공학 연구동 · 보안 구역",
+        floors: [
+          "research:B3",
+          "research:B2",
+          "research:B1",
+          "research:1F",
+          "research:2F",
+          "research:3F",
+        ],
+        className: "campus-building--research",
+      },
+      support: {
+        id: "support",
+        name: "관리지원동",
+        short: "관리지원동",
+        description: "행정 · CCTV · 통신 · 시설 제어",
+        floors: ["support:1F"],
+        className: "campus-building--support",
+      },
+    };
+  }
+
+  function buildFloorDefinition(floorId, spec) {
+    const cells = {};
+
+    for (let y = 0; y < GRID_ROWS; y += 1) {
+      for (let x = 0; x < GRID_COLUMNS; x += 1) {
+        cells[cellKey(x, y)] = {
+          x,
+          y,
+          roomId: spec.defaultRoom.id,
+          roomLabel: spec.defaultRoom.label,
+          color: spec.defaultRoom.color,
+          labelHere: false,
+          edgeRight: false,
+          edgeBottom: false,
+        };
+      }
+    }
+
+    spec.rooms.forEach((roomSpec) => {
+      for (let y = roomSpec.y1; y <= roomSpec.y2; y += 1) {
+        for (let x = roomSpec.x1; x <= roomSpec.x2; x += 1) {
+          const key = cellKey(x, y);
+          cells[key] = {
+            ...cells[key],
+            roomId: roomSpec.id,
+            roomLabel: roomSpec.label,
+            color: roomSpec.color,
+          };
+        }
+      }
+
+      const labelX = Math.floor((roomSpec.x1 + roomSpec.x2) / 2);
+      const labelY = Math.floor((roomSpec.y1 + roomSpec.y2) / 2);
+      if (cells[cellKey(labelX, labelY)]) {
+        cells[cellKey(labelX, labelY)].labelHere = true;
+      }
+    });
+
+    for (let y = 0; y < GRID_ROWS; y += 1) {
+      for (let x = 0; x < GRID_COLUMNS; x += 1) {
+        const cell = cells[cellKey(x, y)];
+        const right = x < GRID_COLUMNS - 1 ? cells[cellKey(x + 1, y)] : null;
+        const bottom = y < GRID_ROWS - 1 ? cells[cellKey(x, y + 1)] : null;
+        cell.edgeRight = Boolean(right && right.roomId !== cell.roomId);
+        cell.edgeBottom = Boolean(bottom && bottom.roomId !== cell.roomId);
+      }
+    }
+
+    return {
+      id: floorId,
+      cells,
+      rooms: spec.rooms,
+      transitions: spec.transitions || [],
+      doorways: new Set((spec.doorways || []).map((door) => edgeKey(...door))),
+      investigations: spec.investigations || [],
+      entities: spec.entities || [],
+      corpseRoute: spec.corpseRoute || [],
+    };
+  }
+
+  function additionalFloorSpec(
+    id,
+    label,
+    defaultRoom,
+    rooms,
+    transitions = [],
+  ) {
+    const spec = {
+      defaultRoom,
+      rooms,
+      doorways: [],
+      transitions,
+      investigations: [],
+      entities: [],
+      corpseRoute: [],
+    };
+    return buildFloorDefinition(id, spec);
+  }
+
+  function createAdditionalFloorDefinitions() {
+    const floors = {};
+
+    /* 연구별관 B1 */
+    floors["research:B1"] = additionalFloorSpec(
+      "research:B1",
+      "B1",
+      {
+        id: "research_b1_staff_corridor",
+        label: "직원 전용 복도",
+        color: "#e5e8ea",
+      },
+      [
+        room("research_b1_machine", "기계실", 0, 0, 2, 1, "#f4f5f6"),
+        room("research_b1_reagent", "시약창고", 3, 0, 5, 1, "#f3f4f5"),
+        room("research_b1_waste", "폐기물 임시보관실", 6, 0, 8, 1, "#f0f2f3"),
+        room("research_b1_stairs", "계단", 9, 0, 10, 1, "#eceff1"),
+        room("research_b1_elevator", "엘리베이터", 11, 0, 11, 1, "#eceff1"),
+        room(
+          "research_b1_staff_corridor",
+          "직원 전용 복도",
+          0,
+          2,
+          11,
+          4,
+          "#e4e7e9",
+        ),
+        room("research_b1_loading", "화물 하역장", 0, 5, 5, 7, "#f5f5f5"),
+        room(
+          "research_b1_security",
+          "비공개 승강기 보안 전실",
+          6,
+          5,
+          8,
+          7,
+          "#f2f3f4",
+        ),
+        room("research_b1_freight", "전용 승강기", 9, 5, 10, 7, "#eceff1"),
+        room(
+          "research_b1_emergency_stairs",
+          "비상계단",
+          11,
+          5,
+          11,
+          7,
+          "#eceff1",
+        ),
+      ],
+      [
+        { x: 9, y: 0, type: "stairs", destinations: ["research:1F"] },
+        {
+          x: 11,
+          y: 0,
+          type: "elevator",
+          destinations: ["research:1F", "research:2F", "research:3F"],
+        },
+        {
+          x: 9,
+          y: 6,
+          type: "freight",
+          destinations: ["research:B2", "research:B3"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "emergency_stairs",
+          destinations: ["research:B2", "research:B3"],
+        },
+        { x: 0, y: 6, type: "service_link", destinations: ["B1"] },
+      ],
+    );
+
+    /* 연구별관 1F */
+    floors["research:1F"] = additionalFloorSpec(
+      "research:1F",
+      "1F",
+      { id: "research_1f_hall", label: "전시 홀", color: "#e4e7e9" },
+      [
+        room("research_1f_result", "연구성과 전시실", 0, 0, 3, 1, "#f4f5f6"),
+        room("research_1f_wetlab", "실증실험실", 4, 0, 6, 1, "#f4f5f6"),
+        room("research_1f_demo", "장비 시연실", 7, 0, 9, 1, "#f4f5f6"),
+        room("research_1f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("research_1f_stairs", "계단", 11, 0, 11, 2, "#eceff1"),
+        room("research_1f_wc_m", "화장실(남)", 11, 3, 11, 4, "#f0f3f5"),
+        room("research_1f_elevator", "엘리베이터", 11, 5, 11, 7, "#eceff1"),
+        room("research_1f_hall", "전시 홀", 0, 2, 10, 5, "#e4e7e9"),
+        room("research_1f_sample", "표본접수실", 0, 6, 3, 7, "#f4f5f6"),
+        room("research_1f_common", "공용 출입구역", 4, 6, 10, 7, "#e4e7e9"),
+      ],
+      [
+        {
+          x: 11,
+          y: 1,
+          type: "stairs",
+          destinations: ["research:B1", "research:2F"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["research:B1", "research:2F", "research:3F"],
+        },
+      ],
+    );
+
+    /* 연구별관 2F */
+    floors["research:2F"] = additionalFloorSpec(
+      "research:2F",
+      "2F",
+      { id: "research_2f_corridor", label: "복도", color: "#e4e7e9" },
+      [
+        room("research_2f_bio", "생체재료 분석실", 0, 0, 3, 2, "#f4f5f6"),
+        room("research_2f_cold", "저온보관실", 4, 0, 6, 2, "#f3f4f5"),
+        room("research_2f_clean", "무균실", 7, 0, 9, 2, "#f3f4f5"),
+        room("research_2f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("research_2f_stairs", "계단", 11, 0, 11, 2, "#eceff1"),
+        room("research_2f_wc_m", "화장실(남)", 11, 3, 11, 4, "#f0f3f5"),
+        room("research_2f_elevator", "엘리베이터", 11, 5, 11, 7, "#eceff1"),
+        room("research_2f_corridor", "복도", 0, 3, 10, 5, "#e4e7e9"),
+        room("research_2f_precision", "정밀기기실", 0, 6, 5, 7, "#f4f5f6"),
+      ],
+      [
+        {
+          x: 11,
+          y: 1,
+          type: "stairs",
+          destinations: ["research:1F", "research:3F"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["research:B1", "research:1F", "research:3F"],
+        },
+      ],
+    );
+
+    /* 연구별관 3F */
+    floors["research:3F"] = additionalFloorSpec(
+      "research:3F",
+      "3F",
+      {
+        id: "research_3f_staff_corridor",
+        label: "직원 전용 복도",
+        color: "#e4e7e9",
+      },
+      [
+        room("research_3f_office", "연구원 사무실", 0, 0, 4, 2, "#f4f5f6"),
+        room("research_3f_pi", "책임연구자실", 5, 0, 7, 2, "#f4f5f6"),
+        room("research_3f_meeting", "회의실", 8, 0, 9, 2, "#f4f5f6"),
+        room("research_3f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("research_3f_stairs", "계단", 11, 0, 11, 2, "#eceff1"),
+        room("research_3f_wc_m", "화장실(남)", 11, 3, 11, 4, "#f0f3f5"),
+        room("research_3f_elevator", "엘리베이터", 11, 5, 11, 7, "#eceff1"),
+        room(
+          "research_3f_staff_corridor",
+          "직원 전용 복도",
+          0,
+          3,
+          10,
+          5,
+          "#e4e7e9",
+        ),
+        room("research_3f_records", "연구기록 보관실", 0, 6, 4, 7, "#f4f5f6"),
+      ],
+      [
+        { x: 11, y: 1, type: "stairs", destinations: ["research:2F"] },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["research:B1", "research:1F", "research:2F"],
+        },
+      ],
+    );
+
+    /* 연구별관 B2 */
+    floors["research:B2"] = additionalFloorSpec(
+      "research:B2",
+      "B2",
+      { id: "research_b2_security", label: "보안구역", color: "#e4e1e1" },
+      [
+        restrictedRoom("research_b2_escape", "직원 탈의실", 0, 0, 2, 1),
+        restrictedRoom("research_b2_control", "제염실", 3, 0, 4, 1),
+        restrictedRoom("research_b2_freeze", "동결매질 조제실", 5, 0, 7, 1),
+        restrictedRoom("research_b2_corpse", "영체 모사체 실험실", 8, 0, 9, 1),
+        room("research_b2_stairs", "보안계단", 10, 0, 10, 1, "#eceff1"),
+        room("research_b2_elevator", "전용 승강기", 11, 0, 11, 1, "#eceff1"),
+        room("research_b2_security", "보안구역", 0, 2, 11, 4, "#dfdddd"),
+        room(
+          "research_b2_records",
+          "사고기록 및 명부 대조실",
+          3,
+          3,
+          7,
+          4,
+          "#f1e8e8",
+        ),
+        restrictedRoom("research_b2_fraud", "사기 변환 연구실", 0, 5, 2, 7),
+        restrictedRoom("research_b2_comms", "저승 측 통신실", 3, 5, 4, 7),
+        restrictedRoom("research_b2_server", "기밀자료 서버실", 5, 5, 7, 7),
+        restrictedRoom("research_b2_observe", "관찰·통제실", 8, 5, 9, 7),
+        room(
+          "research_b2_emergency_stairs",
+          "비상계단",
+          10,
+          5,
+          10,
+          7,
+          "#eceff1",
+        ),
+        room("research_b2_freight", "화물 승강기", 11, 5, 11, 7, "#eceff1"),
+      ],
+      [
+        {
+          x: 10,
+          y: 0,
+          type: "emergency_stairs",
+          destinations: ["research:B1", "research:B3"],
+        },
+        {
+          x: 11,
+          y: 0,
+          type: "freight",
+          destinations: ["research:B1", "research:B3"],
+        },
+        {
+          x: 10,
+          y: 6,
+          type: "emergency_stairs",
+          destinations: ["research:B1", "research:B3"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "freight",
+          destinations: ["research:B1", "research:B3"],
+        },
+      ],
+    );
+
+    /* 연구별관 B3 */
+    floors["research:B3"] = additionalFloorSpec(
+      "research:B3",
+      "B3",
+      {
+        id: "research_b3_core_corridor",
+        label: "핵심설비 통로",
+        color: "#dedcdc",
+      },
+      [
+        restrictedRoom(
+          "research_b3_tank",
+          "미완성 동결매질 저장탱크",
+          0,
+          0,
+          2,
+          1,
+        ),
+        restrictedRoom("research_b3_sync", "이승·저승 동기화실", 3, 0, 5, 1),
+        restrictedRoom("research_b3_pressure", "압력조절실", 6, 0, 7, 1),
+        restrictedRoom("research_b3_seal", "자동봉쇄 장치", 8, 0, 9, 1),
+        room("research_b3_stairs", "보안계단", 10, 0, 10, 1, "#eceff1"),
+        room("research_b3_elevator", "전용 승강기", 11, 0, 11, 1, "#eceff1"),
+        room(
+          "research_b3_core_corridor",
+          "핵심설비 통로",
+          0,
+          2,
+          2,
+          4,
+          "#dfdddd",
+        ),
+        room("research_b3_core", "동결건조 변화기 본체", 3, 2, 8, 4, "#efe7e7"),
+        restrictedRoom("research_b3_emergency", "비상회수 장치", 0, 5, 2, 7),
+        restrictedRoom("research_b3_collect", "오염매질 집수조", 3, 5, 5, 7),
+        restrictedRoom("research_b3_center", "중앙 제어실", 6, 5, 8, 7),
+        room("research_b3_stairs_2", "비상계단", 10, 5, 10, 7, "#eceff1"),
+        room("research_b3_freight", "화물 승강기", 11, 5, 11, 7, "#eceff1"),
+      ],
+      [
+        {
+          x: 10,
+          y: 0,
+          type: "emergency_stairs",
+          destinations: ["research:B2"],
+        },
+        { x: 11, y: 0, type: "freight", destinations: ["research:B2"] },
+        {
+          x: 10,
+          y: 6,
+          type: "emergency_stairs",
+          destinations: ["research:B2"],
+        },
+        { x: 11, y: 6, type: "freight", destinations: ["research:B2"] },
+      ],
+    );
+
+    /* 관리지원동 1F */
+    floors["support:1F"] = additionalFloorSpec(
+      "support:1F",
+      "1F",
+      { id: "support_control_zone", label: "통제구역", color: "#e3e6e8" },
+      [
+        room("support_cctv", "중앙 CCTV실", 0, 0, 1, 1, "#f3f4f5"),
+        room("support_access", "출입권한 통제실", 2, 0, 3, 1, "#f3f4f5"),
+        room("support_broadcast", "비상 방송실", 4, 0, 5, 1, "#f3f4f5"),
+        room("support_satellite", "위성통신 단말실", 6, 0, 7, 1, "#f3f4f5"),
+        room("support_fire", "소방설비 제어실", 8, 0, 9, 1, "#f3f4f5"),
+        room("support_stairs", "비상계단", 10, 0, 11, 1, "#eceff1"),
+        room("support_control_zone", "통제구역", 0, 2, 11, 4, "#e3e6e8"),
+        room(
+          "support_server",
+          "내부 서버 · 전용 와이파이",
+          3,
+          2,
+          7,
+          3,
+          "#f2f3f4",
+        ),
+        room("support_generator", "비상발전기실", 0, 5, 2, 7, "#f3f4f5"),
+        room("support_fuel", "연료 탱크실", 3, 5, 4, 7, "#f3f4f5"),
+        room("support_water", "급수펌프·정수설비", 5, 5, 6, 7, "#f3f4f5"),
+        room("support_hvac", "중앙 공조·제습설비", 7, 5, 9, 7, "#f3f4f5"),
+        room("support_firewall", "방화문 제어반", 10, 5, 10, 7, "#f3f4f5"),
+        room("support_freight", "화물 승강기", 11, 5, 11, 7, "#eceff1"),
+      ],
+      [],
+    );
+
+    /* 생활관 B1 */
+    floors["living:B1"] = additionalFloorSpec(
+      "living:B1",
+      "B1",
+      { id: "living_b1_corridor", label: "복도", color: "#e4e7e9" },
+      [
+        room("living_b1_food", "식자재창고", 0, 0, 2, 1, "#f4f5f6"),
+        room(
+          "living_b1_emergency_food",
+          "비상식량 보관실",
+          3,
+          0,
+          5,
+          1,
+          "#f4f5f6",
+        ),
+        room("living_b1_linen", "린넨실", 6, 0, 8, 1, "#f4f5f6"),
+        room("living_b1_stairs", "계단", 9, 0, 10, 1, "#eceff1"),
+        room("living_b1_elevator", "엘리베이터", 11, 0, 11, 1, "#eceff1"),
+        room("living_b1_corridor", "복도", 0, 2, 11, 5, "#e4e7e9"),
+        room("living_b1_laundry", "세탁실", 0, 6, 4, 7, "#f4f5f6"),
+        room("living_b1_cleaning", "청소용품 보관실", 5, 6, 8, 7, "#f4f5f6"),
+      ],
+      [
+        { x: 9, y: 0, type: "stairs", destinations: ["living:1F"] },
+        {
+          x: 11,
+          y: 0,
+          type: "elevator",
+          destinations: ["living:1F", "living:2F", "living:3F", "living:4F"],
+        },
+      ],
+    );
+
+    /* 생활관 1F */
+    floors["living:1F"] = additionalFloorSpec(
+      "living:1F",
+      "1F",
+      { id: "living_1f_hall", label: "중앙 홀", color: "#e4e7e9" },
+      [
+        room("living_1f_kitchen", "주방", 0, 0, 3, 1, "#f4f5f6"),
+        room("living_1f_cafeteria", "학생식당", 4, 0, 8, 1, "#f4f5f6"),
+        room("living_1f_wc_w", "화장실(여)", 9, 0, 9, 1, "#f5f2f2"),
+        room("living_1f_stairs", "계단", 10, 0, 10, 1, "#eceff1"),
+        room("living_1f_elevator", "엘리베이터", 11, 0, 11, 1, "#eceff1"),
+        room("living_1f_hall", "중앙 홀", 0, 2, 11, 5, "#e4e7e9"),
+        room("living_1f_lounge", "공용 라운지", 0, 6, 2, 7, "#f4f5f6"),
+        room("living_1f_store", "편의매점", 3, 6, 5, 7, "#f4f5f6"),
+        room("living_1f_office", "생활관 행정실", 6, 6, 8, 7, "#f4f5f6"),
+        room("living_1f_wc_m", "화장실(남)", 9, 6, 9, 7, "#f0f3f5"),
+      ],
+      [
+        {
+          x: 10,
+          y: 0,
+          type: "stairs",
+          destinations: ["living:B1", "living:2F"],
+        },
+        {
+          x: 11,
+          y: 0,
+          type: "elevator",
+          destinations: ["living:B1", "living:2F", "living:3F", "living:4F"],
+        },
+        { x: 0, y: 4, type: "main_link", destinations: ["1F"] },
+      ],
+    );
+
+    function dormFloor(id, floorNo, roomStart, specialBottom = null) {
+      const topRooms = [];
+      const bottomRooms = [];
+      for (let i = 0; i < 5; i += 1) {
+        topRooms.push(
+          room(
+            `${id}_room_${roomStart + i}`,
+            `${roomStart + i}호`,
+            i * 2,
+            0,
+            i * 2 + 1,
+            1,
+            "#f4f5f6",
+          ),
+        );
+      }
+      for (let i = 0; i < 5; i += 1) {
+        bottomRooms.push(
+          room(
+            `${id}_room_${roomStart + 5 + i}`,
+            `${roomStart + 5 + i}호`,
+            i * 2,
+            6,
+            i * 2 + 1,
+            7,
+            "#f4f5f6",
+          ),
+        );
+      }
+      return additionalFloorSpec(
+        id,
+        floorNo,
+        { id: `${id}_corridor`, label: "복도", color: "#e4e7e9" },
+        [
+          ...topRooms,
+          room(`${id}_wc_w`, "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+          room(`${id}_stairs`, "계단", 11, 0, 11, 1, "#eceff1"),
+          room(`${id}_corridor`, "복도", 0, 2, 11, 5, "#e4e7e9"),
+          room(`${id}_lounge`, "휴게실", 2, 3, 4, 4, "#f4f5f6"),
+          room(`${id}_water`, "정수실", 5, 3, 6, 4, "#f4f5f6"),
+          room(`${id}_shower`, "공용 샤워실", 7, 3, 9, 4, "#f4f5f6"),
+          ...bottomRooms,
+          room(`${id}_wc_m`, "화장실(남)", 10, 6, 10, 7, "#f0f3f5"),
+          room(`${id}_elevator`, "엘리베이터", 11, 6, 11, 7, "#eceff1"),
+        ],
+        [],
+      );
+    }
+
+    /* 생활관 2F */
+    floors["living:2F"] = additionalFloorSpec(
+      "living:2F",
+      "2F",
+      { id: "living_2f_corridor", label: "복도", color: "#e4e7e9" },
+      [
+        room("living_201", "201호", 0, 0, 1, 1, "#f4f5f6"),
+        room("living_202", "202호", 2, 0, 3, 1, "#f4f5f6"),
+        room("living_203", "203호", 4, 0, 5, 1, "#f4f5f6"),
+        room("living_204", "204호", 6, 0, 7, 1, "#f4f5f6"),
+        room("living_205", "205호", 8, 0, 9, 1, "#f4f5f6"),
+        room("living_2f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("living_2f_stairs", "계단", 11, 0, 11, 1, "#eceff1"),
+        room("living_2f_corridor", "복도", 0, 2, 11, 5, "#e4e7e9"),
+        room("living_2f_lounge", "휴게실", 2, 3, 4, 4, "#f4f5f6"),
+        room("living_2f_water", "정수실", 5, 3, 6, 4, "#f4f5f6"),
+        room("living_2f_shower", "공용 샤워실", 7, 3, 9, 4, "#f4f5f6"),
+        room("living_206", "206호", 0, 6, 1, 7, "#f4f5f6"),
+        room("living_207", "207호", 2, 6, 3, 7, "#f4f5f6"),
+        room("living_208", "208호", 4, 6, 5, 7, "#f4f5f6"),
+        room("living_209", "209호", 6, 6, 7, 7, "#f4f5f6"),
+        room("living_210", "210호", 8, 6, 9, 7, "#f4f5f6"),
+        room("living_2f_wc_m", "화장실(남)", 10, 6, 10, 7, "#f0f3f5"),
+        room("living_2f_elevator", "엘리베이터", 11, 6, 11, 7, "#eceff1"),
+      ],
+      [
+        {
+          x: 11,
+          y: 0,
+          type: "stairs",
+          destinations: ["living:1F", "living:3F"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["living:B1", "living:1F", "living:3F", "living:4F"],
+        },
+      ],
+    );
+
+    /* 생활관 3F */
+    floors["living:3F"] = additionalFloorSpec(
+      "living:3F",
+      "3F",
+      { id: "living_3f_corridor", label: "복도", color: "#e4e7e9" },
+      [
+        room("living_301", "301호", 0, 0, 1, 1, "#f4f5f6"),
+        room("living_302", "302호", 2, 0, 3, 1, "#f4f5f6"),
+        room("living_303", "303호", 4, 0, 5, 1, "#f4f5f6"),
+        room("living_304", "304호", 6, 0, 7, 1, "#f4f5f6"),
+        room("living_305", "305호", 8, 0, 9, 1, "#f4f5f6"),
+        room("living_3f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("living_3f_stairs", "계단", 11, 0, 11, 1, "#eceff1"),
+        room("living_3f_corridor", "복도", 0, 2, 11, 5, "#e4e7e9"),
+        room("living_3f_lounge", "휴게실", 2, 3, 4, 4, "#f4f5f6"),
+        room("living_3f_water", "정수실", 5, 3, 6, 4, "#f4f5f6"),
+        room("living_3f_shower", "공용 샤워실", 7, 3, 9, 4, "#f4f5f6"),
+        room("living_306", "306호", 0, 6, 1, 7, "#f4f5f6"),
+        room("living_307", "307호", 2, 6, 3, 7, "#f4f5f6"),
+        room("living_308", "308호", 4, 6, 5, 7, "#f4f5f6"),
+        room("living_309", "309호", 6, 6, 7, 7, "#f4f5f6"),
+        room("living_310", "310호", 8, 6, 9, 7, "#f4f5f6"),
+        room("living_3f_wc_m", "화장실(남)", 10, 6, 10, 7, "#f0f3f5"),
+        room("living_3f_elevator", "엘리베이터", 11, 6, 11, 7, "#eceff1"),
+      ],
+      [
+        {
+          x: 11,
+          y: 0,
+          type: "stairs",
+          destinations: ["living:2F", "living:4F"],
+        },
+        {
+          x: 11,
+          y: 6,
+          type: "elevator",
+          destinations: ["living:B1", "living:1F", "living:2F", "living:4F"],
+        },
+      ],
+    );
+
+    /* 생활관 4F */
+    floors["living:4F"] = additionalFloorSpec(
+      "living:4F",
+      "4F",
+      { id: "living_4f_corridor", label: "복도", color: "#e4e7e9" },
+      [
+        room("living_401", "401호", 0, 0, 1, 1, "#f4f5f6"),
+        room("living_402", "402호", 2, 0, 3, 1, "#f4f5f6"),
+        room("living_403", "403호", 4, 0, 5, 1, "#f4f5f6"),
+        room("living_404", "404호", 6, 0, 7, 1, "#f4f5f6"),
+        room("living_4f_office", "사감실", 8, 0, 9, 1, "#f4f5f6"),
+        room("living_4f_wc_w", "화장실(여)", 10, 0, 10, 1, "#f5f2f2"),
+        room("living_4f_stairs", "계단", 11, 0, 11, 1, "#eceff1"),
+        room("living_4f_corridor", "복도", 0, 2, 11, 5, "#e4e7e9"),
+        room("living_4f_meeting", "소회의실", 3, 3, 7, 4, "#f4f5f6"),
+        room("living_405", "405호", 0, 6, 1, 7, "#f4f5f6"),
+        room("living_406", "406호", 2, 6, 3, 7, "#f4f5f6"),
+        room("living_407", "407호", 4, 6, 5, 7, "#f4f5f6"),
+        room("living_408", "408호", 6, 6, 7, 7, "#f4f5f6"),
+        room("living_4f_wc_m", "화장실(남)", 10, 6, 10, 7, "#f0f3f5"),
+      ],
+      [{ x: 11, y: 0, type: "stairs", destinations: ["living:3F"] }],
+    );
+
+    return floors;
+  }
+
+  function restrictedRoom(id, label, x1, y1, x2, y2) {
+    return { ...room(id, label, x1, y1, x2, y2, "#f4eaea"), restricted: true };
+  }
+
+  function installCrossBuildingTransitions() {
+    const mainB1 = FLOOR_DEFINITIONS.B1;
+    const main1F = FLOOR_DEFINITIONS["1F"];
+    if (
+      mainB1 &&
+      !mainB1.transitions.some((item) => item.type === "service_link")
+    ) {
+      mainB1.transitions.push({
+        x: 9,
+        y: 6,
+        type: "service_link",
+        destinations: ["research:B1"],
+      });
+    }
+    if (
+      main1F &&
+      !main1F.transitions.some((item) => item.type === "main_link")
+    ) {
+      main1F.transitions.push({
+        x: 9,
+        y: 6,
+        type: "main_link",
+        destinations: ["living:1F"],
+      });
+    }
+  }
+
+  function buildingFromFloorKey(floorKey) {
+    if (String(floorKey).startsWith("research:")) return "research";
+    if (String(floorKey).startsWith("living:")) return "living";
+    if (String(floorKey).startsWith("support:")) return "support";
+    return "main";
+  }
+
+  function floorLabelFromKey(floorKey) {
+    const text = String(floorKey || "");
+    return text.includes(":") ? text.split(":").pop() : text;
+  }
+
+  function buildingLabelFromFloor(floorKey) {
+    return (
+      BUILDING_DEFINITIONS[buildingFromFloorKey(floorKey)]?.name || "융합학술동"
+    );
+  }
+
+  function floorKeysForBuilding(buildingId) {
+    return (
+      BUILDING_DEFINITIONS[buildingId]?.floors ||
+      BUILDING_DEFINITIONS.main.floors
+    );
+  }
+
+  function firstFloorForBuilding(buildingId) {
+    const floors = floorKeysForBuilding(buildingId);
+    if (buildingId === "research")
+      return floors.includes("research:1F") ? "research:1F" : floors[0];
+    if (buildingId === "living")
+      return floors.includes("living:1F") ? "living:1F" : floors[0];
+    if (buildingId === "support") return "support:1F";
+    return "1F";
+  }
+
+  function characterLocationText(character) {
+    if (!character) return "";
+    return `${buildingLabelFromFloor(character.floor)} ${floorLabelFromKey(character.floor)} · ${getRoomLabel(character.floor, character.x, character.y)}`;
+  }
+
+  function exposedFloorKeysForBuilding(character, buildingId) {
+    const exposure = getRoleExposure(character.role);
+    return floorKeysForBuilding(buildingId).filter(
+      (floorKey) => exposure.floors[floorKey] !== false,
+    );
+  }
+
+  function renderCampusOverview() {
+    if (!elements.campusMapCanvas) return;
+
+    const counts = Object.fromEntries(
+      Object.keys(BUILDING_DEFINITIONS).map((id) => [id, 0]),
+    );
+    state.characters.forEach((character) => {
+      const buildingId = buildingFromFloorKey(character.floor);
+      if (counts[buildingId] !== undefined) counts[buildingId] += 1;
+    });
+
+    const currentBuilding =
+      ui.currentBuilding ||
+      buildingFromFloorKey(getMovementActor()?.floor || "1F");
+
+    const signature = `${currentBuilding}|${Object.entries(counts)
+      .map(([key, value]) => `${key}:${value}`)
+      .join("|")}`;
+
+    if (
+      signature === campusMapRenderSignature &&
+      elements.campusMapCanvas.childElementCount
+    ) {
+      return;
+    }
+    campusMapRenderSignature = signature;
+
+    const buildingButton = (id, extra = "") => {
+      const building = BUILDING_DEFINITIONS[id];
+      const currentClass = currentBuilding === id ? "is-current-building" : "";
+      return `
+        <button
+          type="button"
+          class="campus-building ${building.className} ${currentClass}"
+          data-campus-building="${id}"
+          aria-label="${escapeHtml(building.name)} 내부 지도 보기"
+        >
+          <span class="campus-building__name">${escapeHtml(building.name)}</span>
+          <span class="campus-building__desc">${escapeHtml(building.description)}</span>
+          <span class="campus-building__meta">${floorKeysForBuilding(id).map(floorLabelFromKey).join(" · ")}</span>
+          <span class="campus-building__occupancy">${counts[id]}명</span>
+          ${extra}
+        </button>`;
+    };
+
+    elements.campusMapCanvas.innerHTML = `
+      <div class="campus-site-map__ring" aria-hidden="true"></div>
+      <div class="campus-site-map__road campus-site-map__road--top" aria-hidden="true"></div>
+      <div class="campus-site-map__road campus-site-map__road--bottom" aria-hidden="true"></div>
+
+      ${buildingButton("support")}
+      ${buildingButton("living")}
+      ${buildingButton("research", '<span class="campus-helipad" aria-hidden="true">H</span>')}
+      ${buildingButton("main")}
+
+      <div class="campus-plaza" aria-label="중앙광장">
+        <strong>중앙광장</strong>
+        <span>정원</span>
+        <i aria-hidden="true"></i>
+      </div>
+
+      <div class="campus-parking" aria-label="주차장 및 셔틀 승강장">
+        <strong>주차장 · 셔틀 승강장</strong>
+      </div>
+      <div class="campus-guard" aria-label="경비소"><strong>경비소</strong></div>
+      <div class="campus-main-gate" aria-label="정문"><strong>정문</strong></div>
+      <div class="campus-north" aria-hidden="true"><span>N</span><i>↑</i></div>
+    `;
+  }
+
+  function openBuildingMap(buildingId) {
+    if (!BUILDING_DEFINITIONS[buildingId]) return;
+    ui.currentBuilding = buildingId;
+    const actor = getMovementActor();
+    const actorFloor = actor?.floor;
+    ui.currentFloor =
+      actor && buildingFromFloorKey(actorFloor) === buildingId
+        ? actorFloor
+        : firstFloorForBuilding(buildingId);
+    ui.mapMode = "floor";
+    closeCampusMapPopup();
+    renderAll();
+  }
+
+  function openSiteMap() {
+    ui.adminTool = null;
+    closeModal();
+    renderCampusOverview();
+    elements.campusMapBackdrop?.classList.remove("is-hidden");
+    elements.campusMapBackdrop?.setAttribute("aria-hidden", "false");
+    document.body.classList.add("campus-map-open");
+  }
+
+  function closeCampusMapPopup() {
+    elements.campusMapBackdrop?.classList.add("is-hidden");
+    elements.campusMapBackdrop?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("campus-map-open");
+  }
+
+  function renderFloorTabs() {
+    const actor = getMovementActor();
+
+    if (ui.mapMode === "site") {
+      elements.floorTabs.innerHTML = "";
+      if (elements.currentFloorLabel) {
+        elements.currentFloorLabel.textContent = "";
+      }
+      return;
+    }
+
+    const buildingId =
+      ui.currentBuilding || buildingFromFloorKey(ui.currentFloor);
+    const floors =
+      session.type === "player"
+        ? exposedFloorKeysForBuilding(actor, buildingId)
+        : floorKeysForBuilding(buildingId);
+
+    if (!floors.includes(ui.currentFloor)) {
+      ui.currentFloor = floors[0] || firstFloorForBuilding(buildingId);
+    }
+
+    elements.currentFloorLabel.textContent = floorLabelFromKey(ui.currentFloor);
+    elements.floorTabs.innerHTML = floors
+      .map((floorId) => {
+        const canTransition =
+          actor?.role === "spirit" &&
+          actor.floor !== floorId &&
+          getTransitionAt(actor.floor, actor.x, actor.y)?.destinations.includes(
+            floorId,
+          );
+        return `<button type="button" data-floor="${floorId}" class="${floorId === ui.currentFloor ? "is-active" : ""}">${floorLabelFromKey(floorId)}${canTransition ? "<small>이동</small>" : ""}</button>`;
+      })
+      .join("");
+  }
+
+  function renderMap() {
+    if (ui.mapMode === "site") {
+      renderCampusOverview();
+      return;
+    }
+
+    const floor = FLOOR_DEFINITIONS[ui.currentFloor];
+    if (!floor) {
+      ui.currentFloor = firstFloorForBuilding(ui.currentBuilding || "main");
+      return renderMap();
+    }
+
+    const perspective = getPerspective();
+    const movementActor = getMovementActor();
+    const reachable = getReachableCellCosts(movementActor, floor.id);
+    const exposure =
+      session.type === "player" ? getRoleExposure(movementActor.role) : null;
+    const warmthAllowed = !exposure || exposure.mapInfo.warmth;
+    const warmth = warmthAllowed
+      ? getWarmthInfo(perspective.mode, perspective.character, floor.id)
+      : { active: false, count: 0, roomId: null };
+    const focusCharacter =
+      perspective.mode === "admin" ? movementActor : perspective.character;
+    const activeRoomId =
+      focusCharacter && focusCharacter.floor === floor.id
+        ? getRoomId(focusCharacter.floor, focusCharacter.x, focusCharacter.y)
+        : null;
+
+    elements.mapGrid.className = "map-grid";
+    elements.mapGrid.style.setProperty("--columns", GRID_COLUMNS);
+    elements.mapGrid.style.setProperty("--rows", GRID_ROWS);
+    elements.mapGrid.classList.toggle(
+      "is-player-locked",
+      session.type === "player" && movementActor.role === "survivor",
+    );
+    elements.mapGrid.innerHTML = "";
+
+    floor.rooms.forEach((roomDefinition) => {
+      const roomElement = document.createElement("div");
+      roomElement.className = `map-room${roomDefinition.restricted ? " is-restricted-room" : ""}`;
+      roomElement.dataset.roomId = roomDefinition.id;
+      roomElement.style.gridColumn = `${roomDefinition.x1 + 1} / ${roomDefinition.x2 + 2}`;
+      roomElement.style.gridRow = `${roomDefinition.y1 + 1} / ${roomDefinition.y2 + 2}`;
+      roomElement.style.setProperty("--room-color", roomDefinition.color);
+      const burningLevel = getSpaceBurningLevel(floor.id, roomDefinition.id);
+      roomElement.dataset.burningLevel = String(burningLevel);
+      if (roomDefinition.id === activeRoomId)
+        roomElement.classList.add("is-active-room");
+      if (warmth.active && roomDefinition.id === warmth.roomId)
+        roomElement.classList.add("is-warm");
+      roomElement.innerHTML = `<span>${escapeHtml(roomDefinition.label)}</span>`;
+      elements.mapGrid.appendChild(roomElement);
+    });
+
+    for (let y = 0; y < GRID_ROWS; y += 1) {
+      for (let x = 0; x < GRID_COLUMNS; x += 1) {
+        const cell = floor.cells[cellKey(x, y)];
+        if (!cell) continue;
+        const key = cellKey(x, y);
+        const cellElement = document.createElement("button");
+        cellElement.type = "button";
+        cellElement.className = "map-cell is-visible";
+        cellElement.dataset.x = String(x);
+        cellElement.dataset.y = String(y);
+        cellElement.dataset.roomId = cell.roomId;
+        cellElement.style.gridColumn = String(x + 1);
+        cellElement.style.gridRow = String(y + 1);
+        cellElement.title = `${cell.roomLabel} · X${x + 1}, Y${y + 1}`;
+        cellElement.setAttribute("role", "gridcell");
+        cellElement.setAttribute("aria-label", cellElement.title);
+
+        if (
+          reachable.has(key) &&
+          movementActor.floor === floor.id &&
+          movementActor.role === "spirit"
+        )
+          cellElement.classList.add("is-reachable");
+        if (
+          movementActor.floor === floor.id &&
+          movementActor.x === x &&
+          movementActor.y === y
+        )
+          cellElement.classList.add("is-current");
+        if (state.layers.danger && isDangerCell(floor.id, x, y))
+          cellElement.classList.add("is-danger");
+        if (getTransitionAt(floor.id, x, y))
+          cellElement.classList.add("is-transition");
+
+        appendMapMarkersWithExposure(
+          cellElement,
+          floor,
+          x,
+          y,
+          perspective,
+          exposure,
+        );
+
+        const canShowPositions = !exposure || exposure.mapInfo.teamPositions;
+        const visibleCharacters = getVisibleCharactersAtCell(
+          floor.id,
+          x,
+          y,
+          perspective,
+          true,
+        ).filter(
+          (character) =>
+            character.id === movementActor.id ||
+            canShowPositions ||
+            getRoomId(character.floor, character.x, character.y) ===
+              activeRoomId,
+        );
+
+        visibleCharacters.forEach((character) => {
+          cellElement.insertAdjacentHTML(
+            "beforeend",
+            tokenMarkup(character, character.id === movementActor.id),
+          );
+        });
+
+        elements.mapGrid.appendChild(cellElement);
+      }
+    }
+
+    renderWarmthBanner(warmth, perspective);
+    updateMovementRule(movementActor);
+  }
+
+  function renderAdminRoster() {
+    const filter = ui.adminRosterFilter || "all";
+    ui.adminRosterFilter = filter;
+    const filteredCharacters = state.characters.filter(
+      (character) => filter === "all" || character.role === filter,
+    );
+
+    const cards = filteredCharacters
+      .map((character) => {
+        const statuses = character.statuses
+          .slice(0, 2)
+          .map((statusId) => {
+            const status = STATUS_DEFINITIONS[statusId];
+            return `<span class="status-icon" title="${escapeHtml(status?.name || statusId)}">${status?.icon || "·"}</span>`;
+          })
+          .join("");
+
+        const movementText =
+          character.role === "spirit"
+            ? `행동력 ${character.ap} / ${character.maxAp}`
+            : "운영진 위치 제어";
+
+        return `
+        <article
+          class="character-card ${character.id === ui.selectedCharacterId ? "is-selected" : ""}"
+          data-select-character="${character.id}"
+          tabindex="0"
+          aria-label="${escapeHtml(character.name)} 선택"
+        >
+          ${avatarMarkup(character)}
+          <span class="character-card__main">
+            <span class="character-card__title">
+              <span class="character-card__id">${character.id}</span>
+              <strong>${escapeHtml(character.name)}</strong>
+              ${roleChipMarkup(character.role)}
+            </span>
+            <span class="character-card__meta">${escapeHtml(characterLocationText(character))}</span>
+            <span class="character-card__submeta">${movementText}</span>
+            ${infectionClockMarkup(character, true)}
+            <span class="character-card__teams">${teamChipsMarkup(character.id)}</span>
+          </span>
+          <span class="character-card__statuses">
+            ${statuses}
+            <button
+              type="button"
+              class="character-card__manage-button"
+              data-manage-character="${character.id}"
+            >
+              관리
+            </button>
+          </span>
+        </article>`;
+      })
+      .join("");
+
+    const teamCards = state.teams.length
+      ? state.teams
+          .map((team) => {
+            const members = team.memberIds.map(getCharacter).filter(Boolean);
+            const visible = team.visible !== false;
+            return `
+            <article
+              class="compact-team-card ${visible ? "" : "is-visibility-off"}"
+              style="--team-color:${team.color}"
+            >
+              <div class="compact-team-card__head">
+                <div>
+                  <strong>${escapeHtml(team.name)}</strong>
+                  <span>${members.length}명 · ${visible ? "위치 공유 중" : "공유 숨김"}</span>
+                </div>
+                <div class="compact-team-card__actions">
+                  <button
+                    type="button"
+                    class="team-eye-button ${visible ? "is-on" : ""}"
+                    data-toggle-team-visibility="${team.id}"
+                    title="그룹은 유지하고 위치 공유만 ${visible ? "끕니다" : "켭니다"}"
+                  >
+                    ${visible ? "◉" : "○"}
+                  </button>
+                  <button type="button" class="compact-icon-button" data-dissolve-team="${team.id}">
+                    해제
+                  </button>
+                </div>
+              </div>
+              <div class="compact-team-card__members">
+                ${members.map((member) => `<button type="button" data-select-character="${member.id}">${escapeHtml(member.name)} <small>${member.id}</small></button>`).join("")}
+              </div>
+            </article>`;
+          })
+          .join("")
+      : `<div class="compact-empty">편성된 팀이 없습니다.</div>`;
+
+    elements.leftSidebar.innerHTML = `
+      <div class="sidebar-header">
+        <h2>캐릭터 현황</h2>
+        <span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span>
+      </div>
+      <div class="sidebar-body">
+        <div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터">
+          <button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button>
+          <button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button>
+          <button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button>
+        </div>
+        <div class="roster-list">
+          ${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}
+        </div>
+        <section class="left-team-section">
+          <div class="left-team-section__head">
+            <div>
+              <p class="eyebrow">TEAM CONTROL</p>
+              <h3>팀 편성 · 위치 공유</h3>
+            </div>
+            <button type="button" class="button button--small button--primary" data-open-team-manager>
+              편성·수정
+            </button>
+          </div>
+          <div class="compact-team-list">${teamCards}</div>
+        </section>
+      </div>`;
+  }
+
+  function renderSelectedSummary() {
+    if (ui.mapMode === "site") {
+      elements.selectedCharacterSummary.innerHTML = `
+        <div class="campus-summary">
+          <strong>학술원 전체 지도</strong>
+          <span>건물을 선택하면 층별 상세 지도로 이동합니다.</span>
+        </div>`;
+      return;
+    }
+
+    const selected = getMovementActor();
+    const visibleTeams = getVisibleTeamsForCharacter(selected.id);
+    const allTeams = getTeamsForCharacter(selected.id);
+    const teamText = allTeams.length
+      ? ` · 그룹 ${allTeams.map((team) => `${team.name}${team.visible === false ? "(숨김)" : ""}`).join(", ")}`
+      : " · 미편성";
+    if (session.type === "admin") {
+      const movement =
+        selected.role === "spirit"
+          ? `행동력 ${selected.ap} / ${selected.maxAp}`
+          : "위치 이동은 운영진만 가능";
+      elements.selectedCharacterSummary.innerHTML = `${avatarMarkup(selected)}<div><h3>${escapeHtml(selected.name)} · ID ${selected.id} ${roleChipMarkup(selected.role)}</h3><p>${escapeHtml(characterLocationText(selected))} · ${movement}${teamText}${visibleTeams.length ? "" : allTeams.length ? " · 원격 공유 없음" : ""}</p>${infectionClockMarkup(selected, true)}</div>`;
+      return;
+    }
+    const playerDetail =
+      selected.role === "spirit"
+        ? ` · 행동력 ${selected.ap} / ${selected.maxAp}`
+        : "";
+    elements.selectedCharacterSummary.innerHTML = `${avatarMarkup(selected)}<div><h3>${escapeHtml(selected.name)} · ID ${selected.id} ${roleChipMarkup(selected.role)}</h3><p>${escapeHtml(characterLocationText(selected))}${playerDetail}${teamText}</p></div>`;
+  }
+
+  function renderAll() {
+    if (!session) return;
+
+    applySessionTheme();
+    const isAdmin = session.type === "admin";
+    document
+      .querySelectorAll(".admin-only")
+      .forEach((node) => node.classList.toggle("is-hidden", !isAdmin));
+
+    elements.adminOperationsButton.classList.toggle(
+      "is-active",
+      isAdmin && ui.operationsOpen,
+    );
+    elements.adminOperationsButton.textContent = ui.operationsOpen
+      ? "지도 페이지"
+      : "관리 페이지";
+    elements.adminOperationsButton.setAttribute(
+      "aria-label",
+      ui.operationsOpen ? "지도 페이지로 이동" : "관리 페이지로 이동",
+    );
+
+    elements.workspace.classList.toggle("workspace--admin", isAdmin);
+    elements.workspace.classList.toggle(
+      "is-hidden",
+      isAdmin && ui.operationsOpen,
+    );
+    elements.adminOperationsView.classList.toggle(
+      "is-hidden",
+      !isAdmin || !ui.operationsOpen,
+    );
+    elements.rightSidebar.classList.toggle("is-hidden", isAdmin);
+
+    renderSessionBadge();
+    renderViewModeNav();
+
+    if (isAdmin && ui.operationsOpen) {
+      renderAdminOperationsPage();
+      return;
+    }
+
+    if (ui.mapMode === "site") ui.mapMode = "floor";
+    const siteMode = false;
+    elements.workspace.classList.remove("workspace--site-map");
+    elements.siteMapButton?.classList.remove("is-hidden");
+    elements.mapViewSection?.classList.toggle("is-hidden", !isAdmin);
+    elements.viewModeNav?.classList.toggle("is-hidden", !isAdmin);
+
+    const currentBuilding =
+      BUILDING_DEFINITIONS[ui.currentBuilding] || BUILDING_DEFINITIONS.main;
+    if (elements.mapEyebrow)
+      elements.mapEyebrow.textContent = siteMode
+        ? "학술원 부지 지도"
+        : "층별 상세 지도";
+    const mapTitle = document.querySelector("#mapTitle");
+    if (mapTitle) {
+      mapTitle.innerHTML = siteMode
+        ? `학술원 부지 안내`
+        : `${escapeHtml(currentBuilding.name)} <span id="currentFloorLabel">${escapeHtml(floorLabelFromKey(ui.currentFloor))}</span>`;
+      elements.currentFloorLabel = document.querySelector("#currentFloorLabel");
+    }
+
+    document
+      .querySelector(".map-floor-section")
+      ?.classList.toggle("is-hidden", siteMode);
+    document
+      .querySelector(".map-panel__footer")
+      ?.classList.toggle("is-site-mode", siteMode);
+
+    renderLeftSidebar();
+    if (!isAdmin) renderRightSidebar();
+    renderFloorTabs();
+    renderMap();
+    renderSelectedSummary();
+    renderEventButton();
+  }
+
+  function handleFloorTabClick(event) {
+    const button = event.target.closest("[data-floor]");
+    if (!button) return;
+    const targetFloor = button.dataset.floor;
+    if (targetFloor === ui.currentFloor) return;
+
+    ui.currentBuilding = buildingFromFloorKey(targetFloor);
+
+    if (session.type === "admin") {
+      ui.currentFloor = targetFloor;
+      ui.mapMode = "floor";
+      renderAll();
+      return;
+    }
+
+    const character = getCharacter(session.characterId);
+    if (
+      !exposedFloorKeysForBuilding(character, ui.currentBuilding).includes(
+        targetFloor,
+      )
+    ) {
+      showToast("운영진이 아직 공개하지 않은 층입니다.");
+      return;
+    }
+
+    if (character.role === "survivor") {
+      ui.currentFloor = targetFloor;
+      ui.mapMode = "floor";
+      renderAll();
+      showToast(
+        "생환자는 공개된 지도를 열람할 수 있지만 자신의 위치는 이동하지 않습니다.",
+      );
+      return;
+    }
+
+    const transition = getTransitionAt(
+      character.floor,
+      character.x,
+      character.y,
+    );
+    if (!transition || !transition.destinations.includes(targetFloor)) {
+      ui.currentFloor = targetFloor;
+      ui.mapMode = "floor";
+      renderAll();
+      showToast(
+        "이 층은 열람 중입니다. 실제 이동은 계단·엘리베이터·연결통로에서 가능합니다.",
+      );
+      return;
+    }
+
+    if (character.ap < 1) {
+      showToast("층 이동에 필요한 행동력이 없습니다.");
+      return;
+    }
+
+    requestSpiritFloorMove(character, targetFloor, transition);
+  }
+
+  function requestSpiritFloorMove(character, targetFloor, transition) {
+    const destinationTransition = findMatchingTransition(
+      targetFloor,
+      transition.type,
+    );
+    if (!destinationTransition) {
+      showToast("도착 지점 정보를 찾을 수 없습니다.");
+      return;
+    }
+    const methodLabels = {
+      stairs: "계단",
+      elevator: "엘리베이터",
+      freight: "화물 승강기",
+      emergency_stairs: "비상계단",
+      service_link: "서비스 통로",
+      main_link: "연결통로",
+    };
+    const method = methodLabels[transition.type] || "연결통로";
+
+    openModal({
+      eyebrow: "공간 이동",
+      title: "빙혼자 이동 확인",
+      body: `<div class="movement-confirmation">
+        <div class="movement-confirmation__route">
+          <span>${escapeHtml(buildingLabelFromFloor(character.floor))} ${escapeHtml(floorLabelFromKey(character.floor))}</span>
+          <strong>→</strong>
+          <span>${escapeHtml(buildingLabelFromFloor(targetFloor))} ${escapeHtml(floorLabelFromKey(targetFloor))}</span>
+        </div>
+        <div class="movement-confirmation__cost"><span>소모 행동력</span><strong>1</strong></div>
+        <p>${escapeHtml(method)}을 이용해 이동합니다.</p>
+      </div>`,
+      footer: `<button type="button" class="button" data-modal-close>취소</button><button type="button" class="button button--primary" data-confirm-floor-move>이동</button>`,
+    });
+
+    elements.modalFooter
+      .querySelector("[data-confirm-floor-move]")
+      ?.addEventListener("click", () => {
+        if (character.ap < 1) {
+          closeModal();
+          showToast("행동력이 부족합니다.");
+          return;
+        }
+        const fromFloor = character.floor;
+        const fromRoom = getRoomLabel(
+          character.floor,
+          character.x,
+          character.y,
+        );
+        character.ap -= 1;
+        character.floor = targetFloor;
+        character.x = destinationTransition.x;
+        character.y = destinationTransition.y;
+        ui.currentFloor = targetFloor;
+        ui.currentBuilding = buildingFromFloorKey(targetFloor);
+        ui.mapMode = "floor";
+        const toRoom = getRoomLabel(character.floor, character.x, character.y);
+        recordSpiritMovement(character, {
+          fromFloor,
+          fromRoom,
+          toFloor: targetFloor,
+          toRoom,
+          cost: 1,
+          source: method,
+        });
+        addLog(
+          `${character.name}이(가) ${method}을 이용해 ${buildingLabelFromFloor(targetFloor)} ${floorLabelFromKey(targetFloor)}으로 이동했습니다.`,
+        );
+        persistState();
+        closeModal();
+        renderAll();
+      });
+  }
+
+  function handleMapClick(event) {
+    const buildingButton = event.target.closest("[data-campus-building]");
+    if (buildingButton) {
+      openBuildingMap(buildingButton.dataset.campusBuilding);
+      return;
+    }
+
+    const tokenElement = event.target.closest("[data-token-character]");
+    if (tokenElement && session.type === "admin" && !ui.adminTool) {
+      const character = getCharacter(
+        Number(tokenElement.dataset.tokenCharacter),
+      );
+      if (character) {
+        ui.selectedCharacterId = character.id;
+        ui.currentFloor = character.floor;
+        ui.currentBuilding = buildingFromFloorKey(character.floor);
+        ui.mapMode = "floor";
+        renderAll();
+        showCharacterManagementModal(character.id);
+      }
+      return;
+    }
+
+    const cellElement = event.target.closest(".map-cell");
+    if (!cellElement || ui.mapMode === "site") return;
+    const x = Number(cellElement.dataset.x);
+    const y = Number(cellElement.dataset.y);
+    const actor = getMovementActor();
+
+    if (session.type === "admin" && ui.adminTool === "forceMove") {
+      const previous = {
+        floor: actor.floor,
+        room: getRoomLabel(actor.floor, actor.x, actor.y),
+      };
+      settleFreezeClock(
+        actor,
+        previous.floor,
+        getRoomIdByLabel(previous.floor, previous.room),
+      );
+      actor.floor = ui.currentFloor;
+      actor.x = x;
+      actor.y = y;
+      if (actor.role === "spirit")
+        recordSpiritMovement(actor, {
+          fromFloor: previous.floor,
+          fromRoom: previous.room,
+          toFloor: actor.floor,
+          toRoom: getRoomLabel(actor.floor, actor.x, actor.y),
+          cost: 0,
+          source: "운영진 강제 이동",
+        });
+      ui.adminTool = null;
+      addLog(
+        `관리자가 ${actor.name}의 위치를 ${buildingLabelFromFloor(ui.currentFloor)} ${floorLabelFromKey(ui.currentFloor)} ${getRoomLabel(ui.currentFloor, x, y)}로 변경했습니다.`,
+      );
+      persistState();
+      renderAll();
+      showToast(
+        `${actor.name}을(를) ${getRoomLabel(ui.currentFloor, x, y)}로 이동했습니다.`,
+      );
+      return;
+    }
+
+    if (session.type === "admin" && ui.adminTool === "danger") {
+      toggleDangerCell(ui.currentFloor, x, y);
+      renderAll();
+      return;
+    }
+
+    if (session.type === "admin") {
+      showTeamDestinationModal(ui.currentFloor, x, y);
+      return;
+    }
+
+    if (actor.role === "survivor") {
+      showToast(
+        "생환자는 자신의 위치를 직접 옮길 수 없습니다. 운영진이 이동시킵니다.",
+      );
+      return;
+    }
+
+    requestSpiritMove(actor, ui.currentFloor, x, y);
+  }
+
+  function getRoomId(floorId, x, y) {
+    return FLOOR_DEFINITIONS[floorId]?.cells[cellKey(x, y)]?.roomId || "";
+  }
+
+  function getRoomLabel(floorId, x, y) {
+    return (
+      FLOOR_DEFINITIONS[floorId]?.cells[cellKey(x, y)]?.roomLabel ||
+      "미지정 공간"
+    );
+  }
+
+  function getInvestigationAt(floorId, x, y) {
+    return (
+      FLOOR_DEFINITIONS[floorId]?.investigations.find(
+        (item) => item.x === x && item.y === y,
+      ) || null
+    );
+  }
+
+  function getTransitionAt(floorId, x, y) {
+    return (
+      FLOOR_DEFINITIONS[floorId]?.transitions.find(
+        (item) => item.x === x && item.y === y,
+      ) || null
+    );
+  }
+
+  function findMatchingTransition(floorId, type) {
+    return (
+      FLOOR_DEFINITIONS[floorId]?.transitions.find(
+        (item) => item.type === type,
+      ) ||
+      FLOOR_DEFINITIONS[floorId]?.transitions[0] ||
+      null
+    );
+  }
+
+  function getPlayerExposedFloors(character) {
+    return exposedFloorKeysForBuilding(
+      character,
+      ui.currentBuilding || buildingFromFloorKey(character.floor),
+    );
+  }
+
+  function installCampusMapEnhancements() {
+    elements.siteMapButton?.addEventListener("click", openSiteMap);
+    elements.campusMapCloseButton?.addEventListener(
+      "click",
+      closeCampusMapPopup,
+    );
+
+    elements.campusMapBackdrop?.addEventListener("click", (event) => {
+      if (event.target === elements.campusMapBackdrop) {
+        closeCampusMapPopup();
+      }
+    });
+
+    elements.campusMapCanvas?.addEventListener("click", (event) => {
+      const buildingButton = event.target.closest("[data-campus-building]");
+      if (!buildingButton) return;
+      openBuildingMap(buildingButton.dataset.campusBuilding);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Escape" &&
+        !elements.campusMapBackdrop?.classList.contains("is-hidden")
+      ) {
+        closeCampusMapPopup();
+      }
+    });
+
+    const originalOperationsHandler = elements.adminOperationsButton;
+    if (originalOperationsHandler) {
+      originalOperationsHandler.addEventListener(
+        "click",
+        () => {
+          if (ui.operationsOpen) {
+            ui.mapMode = "floor";
+          }
+        },
+        true,
+      );
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", installCampusMapEnhancements);
 })();
