@@ -5135,7 +5135,6 @@ body.theme-admin.theme-mode-dark .settings-floor-group h4 {
 
 /* 중첩 배치된 내부 방은 기본 CSS가 우/하단 선만 그리므로
    필요한 방에 상단/좌측 경계선을 명시적으로 추가 */
-.map-room[data-room-id="research_b2_records"],
 .map-room[data-room-id="support_server"],
 .map-room[data-room-id="living_2f_lounge"],
 .map-room[data-room-id="living_2f_water"],
@@ -5161,7 +5160,6 @@ body.theme-admin.theme-mode-dark .settings-floor-group h4 {
 /* 다크모드에서도 새로 보강한 선이 묻히지 않게 */
 body.theme-admin.theme-mode-dark
   :is(
-    .map-room[data-room-id="research_b2_records"],
     .map-room[data-room-id="support_server"],
     .map-room[data-room-id="living_2f_lounge"],
     .map-room[data-room-id="living_2f_water"],
@@ -5173,4 +5171,50 @@ body.theme-admin.theme-mode-dark
   ) {
   border-top-color: #4c5a61;
   border-left-color: #4c5a61;
+}
+
+/* =========================================================
+   연구별관 B3 핵심설비 통로 · 동결 건조 변화기 위치 표시
+   본체를 별도 방으로 나누지 않고 통로 중앙에 점선 원으로 표시
+   ========================================================= */
+
+.map-room[data-room-id="research_b3_core_corridor"] > span:first-child {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.map-room__core-equipment-marker {
+  position: absolute;
+  top: 50%;
+  left: clamp(72px, 8%, 150px);
+  z-index: 2;
+  display: grid;
+  width: clamp(92px, 18%, 138px);
+  aspect-ratio: 1 / 1;
+  place-items: center;
+  transform: translate(-50%, -46%);
+  border: 2px dashed var(--navy-700);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.map-room__core-equipment-marker span {
+  max-width: 78%;
+  font-size: clamp(0.62rem, 0.86vw, 0.78rem);
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+}
+
+body.theme-admin.theme-mode-dark .map-room__core-equipment-marker {
+  border-color: #7a878d;
+  background: rgba(10, 10, 10, 0.76);
+  color: #f5f7f8;
 }

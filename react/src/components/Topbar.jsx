@@ -49,12 +49,12 @@ export default function Topbar() {
           type="button"
           className="button button--operations admin-only"
         >
-          운영페이지
+          관리페이지
         </button>
+        <div id="sessionBadge" className="session-badge" />
         <button id="eventButton" type="button" className="event-button">
           <span aria-hidden="true">!</span> 긴급 이벤트 0건
         </button>
-        <div id="sessionBadge" className="session-badge" />
         <button
           id="logoutButton"
           type="button"

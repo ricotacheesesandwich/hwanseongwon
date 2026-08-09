@@ -2126,6 +2126,39 @@
       return;
     }
 
+    const editManualStatusButton = event.target.closest(
+      "[data-edit-manual-status]",
+    );
+    if (editManualStatusButton) {
+      const character = getCharacter(ui.selectedCharacterId);
+      if (!character) return;
+      showCharacterStatusEditorModal(
+        character.id,
+        editManualStatusButton.dataset.editManualStatus,
+      );
+      return;
+    }
+
+    const removeManualStatusButton = event.target.closest(
+      "[data-remove-manual-status]",
+    );
+    if (removeManualStatusButton) {
+      const character = getCharacter(ui.selectedCharacterId);
+      if (!character) return;
+      character.manualStatuses = (character.manualStatuses || []).filter(
+        (status) =>
+          status.id !== removeManualStatusButton.dataset.removeManualStatus,
+      );
+      addLog(
+        `관리자가 ${character.name}의 관리자 추가 상태이상을 삭제했습니다.`,
+      );
+      persistState();
+      renderAll();
+      if (ui.operationsOpen) renderAdminOperationsPage();
+      showCharacterStatusEditorModal(character.id);
+      return;
+    }
+
     const removeStatusButton = event.target.closest("[data-remove-status]");
     if (removeStatusButton) {
       const character = getCharacter(ui.selectedCharacterId);
@@ -2262,6 +2295,55 @@
   }
 
   function handleRightSidebarSubmit(event) {
+    const characterStatusForm = event.target.closest(
+      "[data-character-status-form]",
+    );
+    if (characterStatusForm) {
+      event.preventDefault();
+      if (session?.type !== "admin") return;
+      const formData = new FormData(characterStatusForm);
+      const character = getCharacter(Number(formData.get("characterId")));
+      const bodyPart = String(formData.get("bodyPart") || "").trim();
+      const severity = String(formData.get("severity") || "").trim();
+      const detail = String(formData.get("detail") || "").trim();
+      if (!character || !bodyPart || !severity) {
+        showToast("다친 부위와 정도를 입력해 주세요.");
+        return;
+      }
+      if (!Array.isArray(character.manualStatuses))
+        character.manualStatuses = [];
+      const statusId = String(formData.get("statusId") || "");
+      const existingStatus = character.manualStatuses.find(
+        (status) => status.id === statusId,
+      );
+      if (existingStatus) {
+        existingStatus.bodyPart = bodyPart;
+        existingStatus.severity = severity;
+        existingStatus.detail = detail;
+        existingStatus.updatedAt = new Date().toISOString();
+        addLog(
+          `관리자가 ${character.name}의 상태이상 「${bodyPart} · ${severity}」을(를) 수정했습니다.`,
+        );
+      } else {
+        character.manualStatuses.push({
+          id: `manual-status-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          bodyPart,
+          severity,
+          detail,
+          createdAt: new Date().toISOString(),
+        });
+        addLog(
+          `관리자가 ${character.name}에게 상태이상 「${bodyPart} · ${severity}」을(를) 추가했습니다.`,
+        );
+      }
+      persistState();
+      renderAll();
+      if (ui.operationsOpen) renderAdminOperationsPage();
+      showCharacterStatusEditorModal(character.id);
+      showToast(`${character.name}의 상태이상을 적용했습니다.`);
+      return;
+    }
+
     const mindNoteForm = event.target.closest("[data-player-mind-note-form]");
     if (mindNoteForm) {
       event.preventDefault();
@@ -5563,6 +5645,15 @@
       renderEventButton();
       return;
     }
+    const statusEditButton = event.target.closest(
+      "[data-edit-character-status]",
+    );
+    if (statusEditButton) {
+      showCharacterStatusEditorModal(
+        Number(statusEditButton.dataset.editCharacterStatus),
+      );
+      return;
+    }
     const characterButton = event.target.closest("[data-operations-character]");
     if (characterButton)
       return showCharacterManagementModal(
@@ -6354,6 +6445,8 @@
       if ("online" in character) delete character.online;
       if (!Array.isArray(character.inventory)) character.inventory = [];
       if (!Array.isArray(character.statuses)) character.statuses = [];
+      if (!Array.isArray(character.manualStatuses))
+        character.manualStatuses = [];
       if (!Array.isArray(character.records)) character.records = [];
       if (!Array.isArray(character.investigations))
         character.investigations = [];
@@ -6566,6 +6659,14 @@
       if (character?.role === "survivor")
         node.style.width = `${Math.min(100, (effectiveFreezeHours(character) / INFECTION_TOTAL_HOURS) * 100)}%`;
     });
+    document
+      .querySelectorAll("[data-character-status-effects]")
+      .forEach((node) => {
+        const character = getCharacter(
+          Number(node.dataset.characterStatusEffects),
+        );
+        if (character) node.innerHTML = renderCharacterStatusEffects(character);
+      });
   }
 
   function isRedLikeColorV3(color) {
@@ -6854,6 +6955,75 @@
     elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body"><div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div><div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div><section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section></div>`;
   }
 
+  const INFECTION_STAGE_EFFECTS = [
+    ["미세한 한기", "갈증"],
+    ["복통", "구토", "손발 저림"],
+    ["체온저하", "관절 경직", "결정화"],
+    ["감각 둔화", "운동장애", "환청", "기억 혼선"],
+    ["장기 기능 저하", "의식 단절", "가사동결", "사망 임박"],
+    ["생명활동 정지", "동결체화"],
+  ];
+
+  function getInfectionStageEffects(character) {
+    const stage = freezeStage(effectiveFreezeHours(character));
+    return INFECTION_STAGE_EFFECTS[stage] || INFECTION_STAGE_EFFECTS[0];
+  }
+
+  function renderCharacterStatusEffects(character) {
+    const statusLabels = [
+      ...(character.role === "survivor"
+        ? getInfectionStageEffects(character)
+        : []),
+      ...(character.manualStatuses || []).map((status) =>
+        `${status.bodyPart} ${status.severity}`.trim(),
+      ),
+    ].filter(Boolean);
+
+    if (!statusLabels.length) {
+      return emptyStateMarkup("현재 적용된 상태이상이 없습니다.");
+    }
+
+    return `<div class="status-list__item"><strong>${statusLabels
+      .map((label) => escapeHtml(label))
+      .join(", ")}</strong></div>`;
+  }
+
+  function showCharacterStatusEditorModal(characterId, editStatusId = null) {
+    const character = getCharacter(characterId);
+    if (!character || session?.type !== "admin") return;
+    ui.selectedCharacterId = character.id;
+    if (!Array.isArray(character.manualStatuses)) character.manualStatuses = [];
+
+    const editingStatus = editStatusId
+      ? character.manualStatuses.find((status) => status.id === editStatusId) ||
+        null
+      : null;
+    const currentStatuses = character.manualStatuses.length
+      ? character.manualStatuses
+          .map(
+            (status) =>
+              `<div class="status-list__item"><div><strong>${escapeHtml(status.bodyPart)} ${escapeHtml(status.severity)}</strong><p>${escapeHtml(status.detail || "상세 내용 없음")}</p></div><span class="control-row"><button type="button" class="button button--small" data-edit-manual-status="${escapeHtml(status.id)}">수정</button><button type="button" class="button button--small button--danger" data-remove-manual-status="${escapeHtml(status.id)}">삭제</button></span></div>`,
+          )
+          .join("")
+      : emptyStateMarkup("관리자가 추가한 상태이상이 없습니다.");
+
+    const infectionStatusSection =
+      character.role === "survivor"
+        ? `<div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>감염 진행 자동 상태이상</strong><span>자동 적용</span></div><div class="status-list"><div class="status-list__item"><strong>${getInfectionStageEffects(
+            character,
+          )
+            .map((effect) => escapeHtml(effect))
+            .join(", ")}</strong></div></div></div>`
+        : "";
+
+    openModal({
+      eyebrow: "STATUS EFFECT EDITOR",
+      title: `${character.name} · 상태이상 수정`,
+      body: `<div class="admin-modal-grid">${infectionStatusSection}<div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>현재 관리자 추가 상태이상</strong><span>${character.manualStatuses.length}건</span></div><div class="status-list">${currentStatuses}</div></div><div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>${editingStatus ? "상태이상 수정" : "상태이상 추가"}</strong><span>부위와 정도를 기록</span></div><form class="operations-form" data-character-status-form><input type="hidden" name="characterId" value="${character.id}"><input type="hidden" name="statusId" value="${escapeHtml(editingStatus?.id || "")}"><label>다친 부위<input class="form-control" name="bodyPart" required maxlength="50" value="${escapeHtml(editingStatus?.bodyPart || "")}" placeholder="예: 왼쪽 팔, 머리, 오른쪽 발목"></label><label>정도<input class="form-control" name="severity" required maxlength="50" value="${escapeHtml(editingStatus?.severity || "")}" placeholder="예: 경상, 중상, 골절, 출혈 심함"></label><label>상세 내용<textarea class="form-control" name="detail" rows="4" maxlength="240" placeholder="필요한 추가 상태나 주의사항을 입력하세요.">${escapeHtml(editingStatus?.detail || "")}</textarea></label><button type="submit" class="button button--primary">${editingStatus ? "수정 적용" : "상태이상 적용"}</button></form></div></div>`,
+      footer: `<button type="button" class="button" data-modal-close>닫기</button>`,
+    });
+  }
+
   function renderPlayerProfile() {
     const character = getCharacter(session.characterId);
     const teams = getTeamsForCharacter(character.id);
@@ -6865,14 +7035,7 @@
     const visibleMembers = [...visibleMemberIds]
       .map(getCharacter)
       .filter((member) => member && member.role === character.role);
-    const statuses = character.statuses.length
-      ? character.statuses
-          .map((statusId) => {
-            const status = STATUS_DEFINITIONS[statusId];
-            return `<div class="status-list__item"><strong>${status.icon} ${escapeHtml(status.name)}</strong><p>${escapeHtml(status.description)}</p></div>`;
-          })
-          .join("")
-      : emptyStateMarkup("현재 적용된 상태이상이 없습니다.");
+    const statuses = renderCharacterStatusEffects(character);
     const movementCard =
       character.role === "spirit"
         ? `<div class="stat-card"><span>행동력</span><strong>${character.ap} / ${character.maxAp}</strong></div>`
@@ -6904,7 +7067,7 @@
       character.role === "spirit"
         ? `<div class="side-note"><strong>빙혼자 이동</strong><p>다른 공간으로 이동할 때 행동력 1이 차감됩니다. 같은 공간의 생환자는 신원 대신 온기와 인원수로만 감지합니다.</p></div>`
         : "";
-    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list">${statuses}</div></section>${spiritGuide}</div>`;
+    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list" data-character-status-effects="${character.id}">${statuses}</div></section>${spiritGuide}</div>`;
   }
 
   function renderSelectedSummary() {
@@ -6933,32 +7096,21 @@
     const selected = getCharacter(characterId);
     if (!selected) return;
     ui.selectedCharacterId = selected.id;
-    const statusOptions = Object.entries(STATUS_DEFINITIONS)
-      .map(
-        ([id, status]) =>
-          `<option value="${id}">${escapeHtml(status.name)}</option>`,
-      )
-      .join("");
-    const statusList = selected.statuses.length
-      ? selected.statuses
-          .map((statusId) => {
-            const status = STATUS_DEFINITIONS[statusId];
-            return `<div class="status-list__item"><strong>${status.icon} ${escapeHtml(status.name)}</strong><button type="button" class="button button--small" data-remove-status="${statusId}">해제</button></div>`;
-          })
-          .join("")
-      : emptyStateMarkup("상태이상 없음");
+
     const apControls =
       selected.role === "spirit"
         ? `<div class="modal-control-card"><div class="modal-control-card__title"><strong>행동력</strong><span>${selected.ap} / ${selected.maxAp}</span></div><p>다른 공간으로 이동할 때마다 행동력 1이 차감됩니다.</p><div class="control-row"><button type="button" class="button button--small" data-admin-action="ap-minus">−1</button><button type="button" class="button button--small" data-admin-action="ap-plus-1">+1</button><button type="button" class="button button--small" data-admin-action="ap-plus-3">+3</button><button type="button" class="button button--small" data-admin-action="ap-max">최대</button></div></div>`
-        : `<div class="modal-control-card"><div class="modal-control-card__title"><strong>이동 권한</strong><span>생환자</span></div><p>플레이어 직접 이동은 잠겨 있으며 운영진만 위치를 변경할 수 있습니다.</p><div class="status-pill status-pill--online">행동력 미적용</div></div>`;
+        : "";
+
     const infectionControl =
       selected.role === "survivor"
         ? `<div class="modal-control-card"><div class="modal-control-card__title"><strong>감염 진행 시간</strong><span data-infection-stage="${selected.id}">${freezeStageLabel(freezeStage(effectiveFreezeHours(selected)))}</span></div><div class="infection-summary-card__time" data-infection-clock="${selected.id}">${infectionClockText(selected)}</div><div class="infection-summary-card__meta"><span>관리자 확인 배속</span><strong data-infection-multiplier="${selected.id}">×${clockMultiplier(selected).toFixed(1)}</strong></div><button type="button" class="button button--danger button--small" data-reset-infection-clock="${selected.id}">120:00:00으로 초기화</button></div>`
-        : `<div class="modal-control-card infection-complete-card"><div class="modal-control-card__title"><strong>감염 상태</strong><span>5단계</span></div><p>빙혼 완료 상태입니다. 잔여 시간과 배율은 적용하거나 표시하지 않습니다.</p></div>`;
+        : "";
+
     openModal({
       eyebrow: "CHARACTER CONTROL",
       title: `${selected.name} · ID ${selected.id}`,
-      body: `<div class="admin-character-overview">${avatarMarkup(selected)}<div><div class="admin-character-overview__title">${roleChipMarkup(selected.role)} <span class="character-card__teams">${teamChipsMarkup(selected.id)}</span></div><strong>${escapeHtml(selected.floor)} · ${escapeHtml(getRoomLabel(selected.floor, selected.x, selected.y))}</strong><span>좌표 X${selected.x + 1}, Y${selected.y + 1}</span></div></div><div class="admin-modal-grid">${apControls}${infectionControl}<div class="modal-control-card"><div class="modal-control-card__title"><strong>개별 위치 이동</strong><span>선택 캐릭터만</span></div><p>버튼을 누른 뒤 지도에서 이동시킬 위치를 선택합니다.</p><div class="control-row"><button type="button" class="button ${ui.adminTool === "forceMove" ? "button--primary" : ""}" data-admin-action="toggle-force-move">선택 캐릭터 이동</button></div></div><div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>역할 및 상태</strong><span>토큰에 즉시 반영</span></div><div class="modal-form-grid"><label class="control-label">분류<select class="form-control" data-role-select><option value="survivor" ${selected.role === "survivor" ? "selected" : ""}>생환자</option><option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>빙혼자</option></select></label>${selected.role === "spirit" ? `<label class="control-label">빙혼 상태<select class="form-control" data-spirit-state-select><option value="stable" ${selected.spiritState === "stable" ? "selected" : ""}>안정</option><option value="unstable" ${selected.spiritState === "unstable" ? "selected" : ""}>불안정</option><option value="freezing" ${selected.spiritState === "freezing" ? "selected" : ""}>동결 진행</option><option value="dormant" ${selected.spiritState === "dormant" ? "selected" : ""}>휴면</option></select><small>현재 상태 시작: ${formatDateTime(selected.spiritSince)} · ${formatElapsed(selected.spiritSince)}</small></label>` : ""}<label class="control-label">상태이상 추가<span class="control-row"><select class="form-control" data-status-select><option value="">상태 선택</option>${statusOptions}</select><button type="button" class="button" data-admin-action="apply-status">적용</button></span></label></div><div class="status-list">${statusList}</div></div></div>`,
+      body: `<div class="admin-character-overview">${avatarMarkup(selected)}<div><div class="admin-character-overview__title">${roleChipMarkup(selected.role)} <span class="character-card__teams">${teamChipsMarkup(selected.id)}</span></div><strong>${escapeHtml(selected.floor)} · ${escapeHtml(getRoomLabel(selected.floor, selected.x, selected.y))}</strong><span>좌표 X${selected.x + 1}, Y${selected.y + 1}</span></div></div><div class="admin-modal-grid">${apControls}${infectionControl}<div class="modal-control-card"><div class="modal-control-card__title"><strong>개별 위치 이동</strong><span>선택 캐릭터만</span></div><p>버튼을 누른 뒤 지도에서 이동시킬 위치를 선택합니다.</p><div class="control-row"><button type="button" class="button ${ui.adminTool === "forceMove" ? "button--primary" : ""}" data-admin-action="toggle-force-move">선택 캐릭터 이동</button></div></div></div>`,
       footer: `<button type="button" class="button" data-modal-close>닫기</button>`,
     });
   }
@@ -6979,7 +7131,18 @@
           character.role === "survivor"
             ? `<div class="spirit-state-cell"><strong data-infection-clock="${character.id}">${infectionClockText(character)}</strong><small><span data-infection-stage="${character.id}">${freezeStageLabel(freezeStage(effectiveFreezeHours(character)))}</span> · <span data-infection-multiplier="${character.id}">×${clockMultiplier(character).toFixed(1)}</span></small></div>`
             : `<div class="spirit-state-cell infection-complete"><strong>5단계 · 빙혼 완료</strong><small>잔여 시간·배율 미적용</small></div>`;
-        return `<tr><td><button type="button" class="operations-character-link" data-operations-character="${character.id}">${character.id} · ${escapeHtml(character.name)}</button></td><td>${roleChipMarkup(character.role)}</td><td>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</td><td><div class="compact-item-list">${items}</div></td><td>${infectionCell}</td><td>${character.statuses.length ? character.statuses.map((id) => `<span class="status-icon">${STATUS_DEFINITIONS[id]?.icon || "·"}</span>`).join("") : "정상"}</td></tr>`;
+        const statusLabels = [
+          ...(character.role === "survivor"
+            ? getInfectionStageEffects(character)
+            : []),
+          ...(character.manualStatuses || []).map((status) =>
+            `${status.bodyPart} ${status.severity}`.trim(),
+          ),
+        ].filter(Boolean);
+        const statusSummary = statusLabels.length
+          ? `<span>${statusLabels.map((label) => escapeHtml(label)).join(", ")}</span>`
+          : `<span class="muted-text">없음</span>`;
+        return `<tr><td><button type="button" class="operations-character-link" data-operations-character="${character.id}">${character.id} · ${escapeHtml(character.name)}</button></td><td>${roleChipMarkup(character.role)}</td><td>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</td><td><div class="compact-item-list">${items}</div></td><td>${infectionCell}</td><td><div class="compact-item-list">${statusSummary}<button type="button" class="button button--small" data-edit-character-status="${character.id}">수정</button></div></td></tr>`;
       })
       .join("");
     return `<section class="operations-card operations-card--roster"><header><div><p class="eyebrow">CHARACTER STATUS</p><h2>캐릭터 현황</h2></div><span>${characters.length}명</span></header><div class="operations-table-wrap"><table class="operations-table"><thead><tr><th>ID · 이름</th><th>분류</th><th>현재 위치</th><th>소지품</th><th>감염 현황</th><th>상태이상</th></tr></thead><tbody>${rows || `<tr><td colspan="6">해당 인원이 없습니다.</td></tr>`}</tbody></table></div></section>`;
@@ -7076,16 +7239,14 @@
     const db = await openMediaDbV3();
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(MEDIA_STORE_NAME_V3, "readwrite");
-      transaction
-        .objectStore(MEDIA_STORE_NAME_V3)
-        .put({
-          key,
-          blob: file,
-          name,
-          type: file.type || "application/octet-stream",
-          size: file.size,
-          createdAt: new Date().toISOString(),
-        });
+      transaction.objectStore(MEDIA_STORE_NAME_V3).put({
+        key,
+        blob: file,
+        name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        createdAt: new Date().toISOString(),
+      });
       transaction.oncomplete = resolve;
       transaction.onerror = () => reject(transaction.error);
     });
@@ -7902,26 +8063,82 @@
       "B2",
       { id: "research_b2_security", label: "보안구역", color: "#e4e1e1" },
       [
-        restrictedRoom("research_b2_escape", "직원 탈의실", 0, 0, 2, 1),
-        restrictedRoom("research_b2_control", "제염실", 3, 0, 4, 1),
-        restrictedRoom("research_b2_freeze", "동결매질 조제실", 5, 0, 7, 1),
-        restrictedRoom("research_b2_corpse", "영체 모사체 실험실", 8, 0, 9, 1),
+        restrictedRoom(
+          "research_b2_escape",
+          "직원 탈의실",
+          0,
+          0,
+          2,
+          1,
+          "#f4f5f6",
+        ),
+        restrictedRoom("research_b2_control", "제염실", 3, 0, 4, 1, "#f4f5f6"),
+        restrictedRoom(
+          "research_b2_freeze",
+          "동결매질 조제실",
+          5,
+          0,
+          7,
+          1,
+          "#f4f5f6",
+        ),
+        restrictedRoom(
+          "research_b2_corpse",
+          "영체 모사체 실험실",
+          8,
+          0,
+          9,
+          1,
+          "#f4f5f6",
+        ),
         room("research_b2_stairs", "보안계단", 10, 0, 10, 1, "#eceff1"),
         room("research_b2_elevator", "전용 승강기", 11, 0, 11, 1, "#eceff1"),
         room("research_b2_security", "보안구역", 0, 2, 11, 4, "#dfdddd"),
         room(
           "research_b2_records",
           "사고기록 및 명부 대조실",
-          3,
-          3,
-          8,
-          4,
+          0,
+          5,
+          0,
+          7,
           "#f4f5f6",
         ),
-        restrictedRoom("research_b2_fraud", "사기 변환 연구실", 0, 5, 2, 7),
-        restrictedRoom("research_b2_comms", "저승 측 통신실", 3, 5, 4, 7),
-        restrictedRoom("research_b2_server", "기밀자료 서버실", 5, 5, 7, 7),
-        restrictedRoom("research_b2_observe", "관찰·통제실", 8, 5, 9, 7),
+        restrictedRoom(
+          "research_b2_fraud",
+          "사기 변환 연구실",
+          1,
+          5,
+          3,
+          7,
+          "#f4f5f6",
+        ),
+        restrictedRoom(
+          "research_b2_comms",
+          "저승 측 통신실",
+          4,
+          5,
+          5,
+          7,
+          "#f4f5f6",
+        ),
+        restrictedRoom(
+          "research_b2_server",
+          "기밀자료 서버실",
+          6,
+          5,
+          7,
+          7,
+          "#f4f5f6",
+        ),
+        restrictedRoom(
+          "research_b2_observe",
+          "관찰·통제실",
+          8,
+          5,
+          9,
+          7,
+          "#f4f5f6",
+        ),
         room(
           "research_b2_emergency_stairs",
           "비상계단",
@@ -7990,12 +8207,10 @@
           "핵심설비 통로",
           0,
           2,
-          2,
+          11,
           4,
           "#e4e7e9",
         ),
-        room("research_b3_core", "동결건조 변화기 본체", 3, 2, 8, 4, "#f4f5f6"),
-        room("research_b3_passage", "통로", 9, 2, 11, 4, "#e4e7e9"),
         room("research_b3_emergency", "비상회수 장치", 0, 5, 2, 7, "#f4f5f6"),
         room("research_b3_collect", "오염매질 집수조", 3, 5, 5, 7, "#f4f5f6"),
         room("research_b3_center", "중앙 제어실", 6, 5, 9, 7, "#f4f5f6"),
@@ -8304,8 +8519,8 @@
     return floors;
   }
 
-  function restrictedRoom(id, label, x1, y1, x2, y2) {
-    return { ...room(id, label, x1, y1, x2, y2, "#f4eaea"), restricted: true };
+  function restrictedRoom(id, label, x1, y1, x2, y2, color = "#f4eaea") {
+    return { ...room(id, label, x1, y1, x2, y2, color), restricted: true };
   }
 
   function installCrossBuildingTransitions() {
@@ -8567,7 +8782,11 @@
         roomElement.classList.add("is-active-room");
       if (warmth.active && roomDefinition.id === warmth.roomId)
         roomElement.classList.add("is-warm");
-      roomElement.innerHTML = `<span>${escapeHtml(roomDefinition.label)}</span>`;
+      const coreEquipmentMarker =
+        roomDefinition.id === "research_b3_core_corridor"
+          ? `<div class="map-room__core-equipment-marker"><span>동결 건조 변화기<br>본체 위치</span></div>`
+          : "";
+      roomElement.innerHTML = `<span>${escapeHtml(roomDefinition.label)}</span>${coreEquipmentMarker}`;
       elements.mapGrid.appendChild(roomElement);
     });
 
@@ -8651,14 +8870,6 @@
 
     const cards = filteredCharacters
       .map((character) => {
-        const statuses = character.statuses
-          .slice(0, 2)
-          .map((statusId) => {
-            const status = STATUS_DEFINITIONS[statusId];
-            return `<span class="status-icon" title="${escapeHtml(status?.name || statusId)}">${status?.icon || "·"}</span>`;
-          })
-          .join("");
-
         const movementText =
           character.role === "spirit"
             ? `행동력 ${character.ap} / ${character.maxAp}`
@@ -8684,7 +8895,6 @@
             <span class="character-card__teams">${teamChipsMarkup(character.id)}</span>
           </span>
           <span class="character-card__statuses">
-            ${statuses}
             <button
               type="button"
               class="character-card__manage-button"
