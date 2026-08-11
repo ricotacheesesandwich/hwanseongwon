@@ -4,6 +4,7 @@
   const STORAGE_KEY = "shu-investigation-prototype-v2";
   const THEME_STORAGE_PREFIX = "shu-account-theme";
   const DEFAULT_THEME_MODE = "light";
+  const FLOOR_RELEASE_SCHEMA = 1;
   const FLOOR_ORDER = ["B1", "1F", "2F", "3F", "4F"];
   const EXPOSURE_FLOOR_OPTIONS = [
     { key: "B1", label: "융합학술동 B1", building: "융합학술동" },
@@ -6395,10 +6396,7 @@
   function defaultRoleExposure(role) {
     return {
       floors: Object.fromEntries(
-        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [
-          key,
-          role === "survivor" ? ["1F", "2F"].includes(key) : true,
-        ]),
+        EXPOSURE_FLOOR_OPTIONS.map(({ key }) => [key, false]),
       ),
       features: { inventory: true, records: true, investigation: true },
       mapInfo: {
@@ -6421,6 +6419,9 @@
     if (!Array.isArray(next.adminMemos)) next.adminMemos = [];
     if (!next.exposure) next.exposure = {};
 
+    const resetPublishedFloors =
+      Number(next.floorReleaseSchema || 0) < FLOOR_RELEASE_SCHEMA;
+
     ["survivor", "spirit"].forEach((role) => {
       const defaults = defaultRoleExposure(role);
       const current = next.exposure[role] || {};
@@ -6429,11 +6430,20 @@
         features: { ...defaults.features, ...(current.features || {}) },
         mapInfo: { ...defaults.mapInfo, ...(current.mapInfo || {}) },
       };
+
+      if (resetPublishedFloors) {
+        EXPOSURE_FLOOR_OPTIONS.forEach(({ key }) => {
+          next.exposure[role].floors[key] = false;
+        });
+      }
+
       delete next.exposure[role].features.board;
       delete next.exposure[role].features.tracking;
       next.exposure[role].mapInfo.burning = false;
       next.exposure[role].mapInfo.danger = false;
     });
+
+    next.floorReleaseSchema = FLOOR_RELEASE_SCHEMA;
 
     next.resourceLibrary.forEach((item) => {
       item.certainty = normalizeCertaintyV3(item.certainty);
@@ -6738,9 +6748,6 @@
   }
 
   function tokenMarkup(character, selected) {
-    const status = character.statuses[0]
-      ? STATUS_DEFINITIONS[character.statuses[0]]
-      : null;
     const team = getTeamForCharacter(character.id);
     const tokenColor =
       character.role === "spirit"
@@ -6756,7 +6763,7 @@
       character.role === "survivor" && coldContact.active && canShowColdMarker
         ? `<i class="character-token__cold-mark" title="한기" aria-label="한기">氷</i>`
         : "";
-    return `<span class="character-token character-token--${character.role} ${team && character.role === "survivor" ? "is-team-colored" : ""} ${selected ? "is-selected" : ""} ${coldContact.active ? "has-cold-contact" : ""}" data-token-character="${character.id}" style="--token-color:${tokenColor};--token-dark:${tokenDark}" title="${escapeHtml(character.name)} · ${character.id} · ${ROLE_LABELS[character.role]}${teamTitle}"><span class="character-token__name">${escapeHtml(character.name)}</span>${status ? `<i class="character-token__status">${status.icon}</i>` : ""}${coldMarkup}</span>`;
+    return `<span class="character-token character-token--${character.role} ${team && character.role === "survivor" ? "is-team-colored" : ""} ${selected ? "is-selected" : ""} ${coldContact.active ? "has-cold-contact" : ""}" data-token-character="${character.id}" style="--token-color:${tokenColor};--token-dark:${tokenDark}" title="${escapeHtml(character.name)} · ${character.id} · ${ROLE_LABELS[character.role]}${teamTitle}"><span class="character-token__name">${escapeHtml(character.name)}</span>${coldMarkup}</span>`;
   }
 
   function renderMap() {
@@ -8688,21 +8695,34 @@
       const currentClass = currentBuilding === id ? "is-current-building" : "";
       const characterClass =
         characterBuilding === id ? "is-character-building" : "";
+
+      const playerCharacter =
+        session.type === "player" ? getCharacter(session.characterId) : null;
+      const visibleFloors = playerCharacter
+        ? exposedFloorKeysForBuilding(playerCharacter, id)
+        : floorKeysForBuilding(id);
+      const isReleased = session.type !== "player" || visibleFloors.length > 0;
+      const releaseClass = isReleased ? "" : "is-unreleased-building";
+      const floorMeta = isReleased
+        ? visibleFloors.map(floorLabelFromKey).join(" · ")
+        : "미공개";
+
       const positionMarker =
         characterBuilding === id
           ? '<span class="campus-building__position-dot" title="현재 위치" aria-label="현재 위치"></span>'
           : "";
+
       return `
         <button
           type="button"
-          class="campus-building ${building.className} ${currentClass} ${characterClass}"
+          class="campus-building ${building.className} ${currentClass} ${characterClass} ${releaseClass}"
           data-campus-building="${id}"
           aria-label="${escapeHtml(building.name)} 내부 지도 보기"
         >
           ${positionMarker}
           <span class="campus-building__name">${escapeHtml(building.name)}</span>
           <span class="campus-building__desc">${escapeHtml(building.description)}</span>
-          <span class="campus-building__meta">${floorKeysForBuilding(id).map(floorLabelFromKey).join(" · ")}</span>
+          <span class="campus-building__meta">${escapeHtml(floorMeta)}</span>
           <span class="campus-building__occupancy">${counts[id]}명</span>
           ${extra}
         </button>`;
@@ -8735,8 +8755,40 @@
 
   function openBuildingMap(buildingId) {
     if (!BUILDING_DEFINITIONS[buildingId]) return;
-    ui.currentBuilding = buildingId;
+
     const actor = getMovementActor();
+
+    if (session.type === "player") {
+      const visibleFloors = exposedFloorKeysForBuilding(actor, buildingId);
+
+      if (!visibleFloors.length) {
+        closeCampusMapPopup();
+        openModal({
+          eyebrow: "지도 접근",
+          title: "아직 공개되지 않은 건물입니다.",
+          body: `<div class="map-release-warning">
+            <p>운영진이 이 건물의 층을 공개한 뒤 열람할 수 있습니다.</p>
+          </div>`,
+          footer: `<button type="button" class="button button--primary" data-modal-close>확인</button>`,
+        });
+        return;
+      }
+
+      ui.currentBuilding = buildingId;
+      const actorFloor = actor?.floor;
+      ui.currentFloor =
+        actor &&
+        buildingFromFloorKey(actorFloor) === buildingId &&
+        visibleFloors.includes(actorFloor)
+          ? actorFloor
+          : visibleFloors[0];
+      ui.mapMode = "floor";
+      closeCampusMapPopup();
+      renderAll();
+      return;
+    }
+
+    ui.currentBuilding = buildingId;
     const actorFloor = actor?.floor;
     ui.currentFloor =
       actor && buildingFromFloorKey(actorFloor) === buildingId
@@ -8780,6 +8832,12 @@
         ? exposedFloorKeysForBuilding(actor, buildingId)
         : floorKeysForBuilding(buildingId);
 
+    if (session.type === "player" && !floors.length) {
+      elements.currentFloorLabel.textContent = "";
+      elements.floorTabs.innerHTML = "";
+      return;
+    }
+
     if (!floors.includes(ui.currentFloor)) {
       ui.currentFloor = floors[0] || firstFloorForBuilding(buildingId);
     }
@@ -8810,6 +8868,32 @@
       return;
     }
 
+    const movementActor = getMovementActor();
+    const buildingId =
+      ui.currentBuilding || buildingFromFloorKey(ui.currentFloor);
+
+    if (session.type === "player") {
+      const visibleFloors = exposedFloorKeysForBuilding(
+        movementActor,
+        buildingId,
+      );
+
+      if (!visibleFloors.length || !visibleFloors.includes(ui.currentFloor)) {
+        elements.mapGrid.className = "map-grid map-grid--unreleased";
+        elements.mapGrid.style.setProperty("--columns", GRID_COLUMNS);
+        elements.mapGrid.style.setProperty("--rows", GRID_ROWS);
+        elements.mapGrid.innerHTML = `
+          <div class="map-unreleased-message">
+            <strong>아직 공개되지 않은 건물입니다.</strong>
+            <span>운영진이 지도를 공개한 뒤 열람할 수 있습니다.</span>
+          </div>
+        `;
+        elements.warmthBanner?.classList.add("is-hidden");
+        updateMovementRule(movementActor);
+        return;
+      }
+    }
+
     const floor = FLOOR_DEFINITIONS[ui.currentFloor];
     if (!floor) {
       ui.currentFloor = firstFloorForBuilding(ui.currentBuilding || "main");
@@ -8817,7 +8901,6 @@
     }
 
     const perspective = getPerspective();
-    const movementActor = getMovementActor();
     const reachable = getReachableCellCosts(movementActor, floor.id);
     const exposure =
       session.type === "player" ? getRoleExposure(movementActor.role) : null;
@@ -9364,10 +9447,15 @@
         actor.floor === ui.currentFloor && actor.x === x && actor.y === y;
       if (isCurrentPosition) return;
 
-      showToast(
-        "생환자는 자신의 위치를 직접 옮길 수 없습니다. 운영진이 이동시킵니다.",
-        1200,
-      );
+      openModal({
+        eyebrow: "이동 제한",
+        title: "위치 이동 불가",
+        body: `<div class="movement-warning">
+          <p>생환자는 자신의 위치를 직접 옮길 수 없습니다.</p>
+          <strong>운영진이 위치를 이동시킵니다.</strong>
+        </div>`,
+        footer: `<button type="button" class="button button--primary" data-modal-close>확인</button>`,
+      });
       return;
     }
 

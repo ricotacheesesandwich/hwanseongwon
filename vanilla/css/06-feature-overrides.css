@@ -6757,3 +6757,581 @@ body.theme-mode-light .campus-map-popup .campus-building__position-dot {
     0 0 0 2px rgba(177, 33, 55, 0.12),
     0 0 7px rgba(177, 33, 55, 0.48);
 }
+
+/* =========================================================
+   플레이어 지도 가독성 + 지도 공개 상태
+   - 생환자/동결체 모두 공개된 층은 관리자 지도처럼 방 이름을 항상 표시
+   - 이동 아이콘이 방 이름을 가리지 않도록 우측 상단으로 이동
+   - 미공개 건물/층은 실제 지도를 렌더링하지 않음
+   ========================================================= */
+
+/* 공개된 지도에서는 방/통로 이름이 시점에 따라 사라지지 않게 */
+body.theme-survivor .map-room,
+body.theme-spirit .map-room {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.theme-survivor .map-room > span:first-child,
+body.theme-spirit .map-room > span:first-child {
+  position: relative;
+  z-index: 7;
+  opacity: 1;
+  visibility: visible;
+  color: inherit;
+  pointer-events: none;
+}
+
+/* 셀 버튼은 구조적인 방 배경과 방 이름을 가리지 않음 */
+body.theme-survivor .map-cell,
+body.theme-spirit .map-cell {
+  background: transparent;
+}
+
+/* 계단/엘리베이터/연결통로 이동 마크가 중앙 글자를 덮지 않게 이동 */
+body.theme-survivor .map-cell.is-transition::after,
+body.theme-spirit .map-cell.is-transition::after {
+  top: 7px;
+  right: 7px;
+  bottom: auto;
+  left: auto;
+  z-index: 12;
+  transform: none;
+}
+
+/* 라이트모드 방 이름 */
+body.theme-survivor.theme-mode-light .map-room > span:first-child,
+body.theme-spirit.theme-mode-light .map-room > span:first-child {
+  color: #0c2744;
+  text-shadow: none;
+}
+
+/* 다크모드 방 이름 */
+body.theme-survivor.theme-mode-dark .map-room > span:first-child {
+  color: #f0f6fc;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.58);
+}
+
+body.theme-spirit.theme-mode-dark .map-room > span:first-child {
+  color: #fff0f2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.62);
+}
+
+/* 미공개 건물/층 화면 */
+.map-grid.map-grid--unreleased {
+  position: relative;
+  min-height: 420px;
+  background: var(--surface-soft);
+}
+
+.map-unreleased-message {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-height: 420px;
+  padding: 32px;
+  text-align: center;
+}
+
+.map-unreleased-message strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.map-unreleased-message span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+body.theme-survivor.theme-mode-dark .map-grid.map-grid--unreleased {
+  border-color: #29445e;
+  background: #071522;
+}
+
+body.theme-spirit.theme-mode-dark .map-grid.map-grid--unreleased {
+  border-color: #57333a;
+  background: #130b0e;
+}
+
+/* 전체지도에서 아직 공개되지 않은 건물 */
+.campus-building.is-unreleased-building {
+  border-style: dashed;
+  filter: saturate(0.62);
+}
+
+.campus-building.is-unreleased-building .campus-building__meta {
+  opacity: 0.72;
+}
+
+/* 경고 팝업 본문 */
+.movement-warning,
+.map-release-warning {
+  display: grid;
+  gap: 8px;
+  padding: 8px 2px;
+}
+
+.movement-warning p,
+.movement-warning strong,
+.map-release-warning p {
+  margin: 0;
+}
+
+.movement-warning strong {
+  color: var(--text);
+}
+
+body.theme-survivor.theme-mode-dark .movement-warning,
+body.theme-survivor.theme-mode-dark .map-release-warning {
+  color: #dce9f7;
+}
+
+body.theme-spirit.theme-mode-dark .movement-warning,
+body.theme-spirit.theme-mode-dark .map-release-warning {
+  color: #f1dce0;
+}
+
+/* =========================================================
+   관리자 다크모드 밝은 영역 최종 보정
+   ========================================================= */
+
+body.theme-admin.theme-mode-dark .operations-page .settings-toggle {
+  border: 1px solid #343e43;
+  background: #111517;
+  color: #e8eef0;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-toggle:hover {
+  border-color: #4a585f;
+  background: #171d20;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-toggle strong {
+  color: #dce5e8;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-toggle > span {
+  border-color: #455158;
+  background: #263036;
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .role-settings-card--survivor
+  .settings-toggle
+  input:checked
+  + span {
+  border-color: #28695d;
+  background: #155548;
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .role-settings-card--spirit
+  .settings-toggle
+  input:checked
+  + span {
+  border-color: #7a3946;
+  background: #5a2631;
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .settings-toggle
+  > span::after,
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .settings-toggle
+  > span::before {
+  background: #d9e2e5;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-section {
+  border-color: #323b40;
+  background: #141617;
+  color: #edf2f4;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-section > h3 {
+  color: #f2f6f7;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-floor-group {
+  border-color: #343e43;
+  background: #101315;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-floor-group h4 {
+  color: #eaf0f2;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .settings-save-bar {
+  border-color: #374248;
+  background: rgba(17, 20, 22, 0.97);
+  color: #dbe4e7;
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.38);
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .settings-save-bar
+  .muted-text {
+  color: #94a3aa;
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .settings-save-bar
+  .button--primary {
+  border-color: #2d5967;
+  background: #123844;
+  color: #f5fbfd;
+}
+
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .settings-save-bar
+  .button--primary:hover {
+  border-color: #3e7181;
+  background: #194956;
+  color: #ffffff;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-room-row {
+  border-color: #353f43;
+  background: #151719;
+  color: #edf2f4;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-room-row:hover {
+  border-color: #4d5b61;
+  background: #1b1f21;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-room-row strong {
+  color: #f4f7f8;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-room-row small {
+  color: #9eabb1;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-level-badge {
+  border: 1px solid #6c512e;
+  background: #2e2518;
+  color: #e8c38e;
+}
+
+body.theme-admin.theme-mode-dark .operations-page .burning-room-row select {
+  border-color: #39464c;
+  background: #090c0e;
+  color: #edf3f5;
+}
+
+body.theme-admin.theme-mode-dark .modal .admin-modal-grid {
+  background: transparent;
+}
+
+body.theme-admin.theme-mode-dark .modal .modal-control-card {
+  border-color: #384247;
+  background: #151719;
+  color: #eaf0f2;
+}
+
+body.theme-admin.theme-mode-dark .modal .modal-control-card__title {
+  border-bottom-color: #30393d;
+}
+
+body.theme-admin.theme-mode-dark .modal .modal-control-card__title strong {
+  color: #f5f7f8;
+}
+
+body.theme-admin.theme-mode-dark .modal .modal-control-card__title span {
+  color: #a9b7bd;
+}
+
+body.theme-admin.theme-mode-dark .modal .status-list {
+  border-color: #303a3f;
+  background: #101214;
+  color: #e9eff1;
+}
+
+body.theme-admin.theme-mode-dark .modal .status-list__item {
+  border-color: #364147;
+  background: #191c1e;
+  color: #edf2f4;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .status-list__item strong {
+  color: #f5f7f8;
+}
+
+body.theme-admin.theme-mode-dark .modal .status-list__item p {
+  color: #aab7bc;
+}
+
+body.theme-admin.theme-mode-dark .modal .empty-state {
+  border-color: #343f44;
+  background: #121517;
+  color: #9fadb3;
+}
+
+body.theme-admin.theme-mode-dark .modal .empty-state p {
+  color: #a9b7bd;
+}
+
+body.theme-admin.theme-mode-dark .modal .operations-form {
+  background: #101214;
+  color: #eaf0f2;
+}
+
+body.theme-admin.theme-mode-dark .modal .operations-form label {
+  color: #dfe7ea;
+}
+
+body.theme-admin.theme-mode-dark .modal .operations-form input,
+body.theme-admin.theme-mode-dark .modal .operations-form textarea,
+body.theme-admin.theme-mode-dark .modal .operations-form select {
+  border-color: #2e6878;
+  background: #06151b;
+  color: #eef8fb;
+}
+
+body.theme-admin.theme-mode-dark .modal .operations-form input::placeholder,
+body.theme-admin.theme-mode-dark .modal .operations-form textarea::placeholder {
+  color: #7695a0;
+}
+
+body.theme-admin.theme-mode-dark .modal .evidence-detail {
+  color: #e9eff1;
+}
+
+body.theme-admin.theme-mode-dark .modal .evidence-detail > p {
+  color: #b8c5ca;
+}
+
+body.theme-admin.theme-mode-dark .modal .evidence-detail__image {
+  border-color: #39464c;
+  background: linear-gradient(145deg, #171d20, #101416);
+  color: #73b8d0;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .evidence-image {
+  border-color: #39464c;
+  background: #101416;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .evidence-image img {
+  background: #101416;
+}
+
+body.theme-admin.theme-mode-dark .modal .detail-grid > div {
+  border-color: #354046;
+  background: #171a1c;
+  color: #e9eff1;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .detail-grid > div span {
+  color: #91a1a8;
+}
+
+body.theme-admin.theme-mode-dark .modal .detail-grid > div strong {
+  color: #f1f5f6;
+}
+
+body.theme-admin.theme-mode-dark .modal {
+  border-color: #37464d;
+  background: #101214;
+  color: #edf2f4;
+}
+
+body.theme-admin.theme-mode-dark .modal__header,
+body.theme-admin.theme-mode-dark .modal__footer {
+  border-color: #343f44;
+  background: #17191b;
+}
+
+body.theme-admin.theme-mode-dark .modal__body {
+  background: #101214;
+}
+
+body.theme-admin.theme-mode-dark .modal__header .icon-button,
+body.theme-admin.theme-mode-dark .modal__footer .button {
+  border-color: #315765;
+  background: #102c36;
+  color: #edf7fa;
+}
+
+body.theme-admin.theme-mode-dark .modal__header .icon-button:hover,
+body.theme-admin.theme-mode-dark .modal__footer .button:hover {
+  border-color: #427487;
+  background: #173b47;
+  color: #ffffff;
+}
+
+/* =========================================================
+   관리자 다크모드 - 캐릭터 관리 / 팀 편성 팝업 최종 보정
+   - 밝은 캐릭터 요약 박스 제거
+   - 현재 그룹 멤버 칩 / 위치공유 눈 버튼 다크화
+   - 지도 일반 상태/증상 아이콘 비표시
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   캐릭터 관리 팝업 상단 요약
+   --------------------------------------------------------- */
+
+body.theme-admin.theme-mode-dark .modal .admin-character-overview {
+  border: 1px solid #394348;
+  background: #17191b;
+  color: #edf2f4;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .admin-character-overview > div {
+  color: #edf2f4;
+}
+
+body.theme-admin.theme-mode-dark .modal .admin-character-overview strong {
+  color: #f5f7f8;
+}
+
+body.theme-admin.theme-mode-dark .modal .admin-character-overview > div > span,
+body.theme-admin.theme-mode-dark .modal .admin-character-overview small {
+  color: #9fadb3;
+}
+
+/* 캐릭터 관리 상단의 그룹 칩도 밝은 흰색이 되지 않게 */
+body.theme-admin.theme-mode-dark .modal .admin-character-overview .team-chip {
+  border-color: #3e4b51;
+  background: #172025;
+  color: #e8f1f4;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview
+  .team-chip--none {
+  border-color: #3a4247;
+  background: #181b1d;
+  color: #bfc9cd;
+}
+
+/* 동결체 역할 칩 */
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview
+  .role-chip--spirit {
+  border-color: #65343f;
+  background: #32171e;
+  color: #ffd8df;
+}
+
+/* 생환자 역할 칩 */
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview
+  .role-chip--survivor {
+  border-color: #28584f;
+  background: #102b27;
+  color: #bff4df;
+}
+
+/* ---------------------------------------------------------
+   팀 편성 팝업 - 현재 그룹 목록
+   --------------------------------------------------------- */
+
+body.theme-admin.theme-mode-dark .modal .team-admin-card {
+  border-color: #3a4449;
+  background: #17191b;
+  color: #edf2f4;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-admin-card strong {
+  color: #ffffff;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-admin-card small {
+  color: #9eabb1;
+}
+
+/* 도현 102 / 까순 103 / 태허 106처럼 표시되는 멤버 칩 */
+body.theme-admin.theme-mode-dark .modal .team-admin-card__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-admin-card__members span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--team-color) 55%, #465158);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--team-color) 12%, #15191b);
+  color: #edf4f6;
+  box-shadow: none;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+/* 위치 공유 눈 버튼 - 흰색 제거 */
+body.theme-admin.theme-mode-dark .modal .team-admin-card .team-eye-button {
+  border: 1px solid #3c5159;
+  background: #11191c;
+  color: #dce9ed;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card
+  .team-eye-button.is-on {
+  border-color: #315d6b;
+  background: #143642;
+  color: #e8faff;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card
+  .team-eye-button:hover {
+  border-color: #4e6872;
+  background: #1b3037;
+  color: #ffffff;
+}
+
+/* 그룹 해제 버튼은 위험 기능답게 어두운 버건디 유지 */
+body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger {
+  border-color: #6a3740;
+  background: #4a2229;
+  color: #fff1f3;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger:hover {
+  border-color: #84505a;
+  background: #5b2b34;
+  color: #ffffff;
+}
+
+/* ---------------------------------------------------------
+   지도 토큰 일반 상태/증상 아이콘 완전 제거
+   JS에서도 생성하지 않지만 이전 DOM/캐시 대비 CSS에서도 차단
+   한기 氷(.character-token__cold-mark)는 대상 아님
+   --------------------------------------------------------- */
+
+.character-token__status {
+  display: none;
+}
