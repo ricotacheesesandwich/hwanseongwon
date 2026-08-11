@@ -1784,6 +1784,7 @@
     if (actor.role === "survivor") {
       showToast(
         "생환자는 자신의 위치를 직접 옮길 수 없습니다. 운영진이 이동시킵니다.",
+        1200,
       );
       return;
     }
@@ -2794,7 +2795,7 @@
     elements.modalFooter.innerHTML = "";
   }
 
-  function showToast(message) {
+  function showToast(message, duration = 2800) {
     window.clearTimeout(ui.toastTimer);
     elements.mapToast.textContent = message;
     elements.mapToast.classList.remove("is-hidden");
@@ -2807,7 +2808,7 @@
     ui.toastTimer = window.setTimeout(() => {
       elements.mapToast.classList.add("is-hidden");
       operationsToast?.classList.add("is-hidden");
-    }, 2800);
+    }, duration);
   }
 
   function addLog(message) {
@@ -4656,9 +4657,6 @@
     if (character.role === "survivor") {
       ui.currentFloor = targetFloor;
       renderAll();
-      showToast(
-        "생환자는 공개된 지도를 열람할 수 있지만 자신의 위치는 이동하지 않습니다.",
-      );
       return;
     }
     const transition = getTransitionAt(
@@ -8664,11 +8662,16 @@
       if (counts[buildingId] !== undefined) counts[buildingId] += 1;
     });
 
+    const movementActor = getMovementActor();
     const currentBuilding =
-      ui.currentBuilding ||
-      buildingFromFloorKey(getMovementActor()?.floor || "1F");
+      ui.currentBuilding || buildingFromFloorKey(movementActor?.floor || "1F");
+    const characterBuilding = movementActor
+      ? buildingFromFloorKey(movementActor.floor)
+      : "";
 
-    const signature = `${currentBuilding}|${Object.entries(counts)
+    const signature = `${currentBuilding}|character:${characterBuilding}|${Object.entries(
+      counts,
+    )
       .map(([key, value]) => `${key}:${value}`)
       .join("|")}`;
 
@@ -8683,13 +8686,20 @@
     const buildingButton = (id, extra = "") => {
       const building = BUILDING_DEFINITIONS[id];
       const currentClass = currentBuilding === id ? "is-current-building" : "";
+      const characterClass =
+        characterBuilding === id ? "is-character-building" : "";
+      const positionMarker =
+        characterBuilding === id
+          ? '<span class="campus-building__position-dot" title="현재 위치" aria-label="현재 위치"></span>'
+          : "";
       return `
         <button
           type="button"
-          class="campus-building ${building.className} ${currentClass}"
+          class="campus-building ${building.className} ${currentClass} ${characterClass}"
           data-campus-building="${id}"
           aria-label="${escapeHtml(building.name)} 내부 지도 보기"
         >
+          ${positionMarker}
           <span class="campus-building__name">${escapeHtml(building.name)}</span>
           <span class="campus-building__desc">${escapeHtml(building.description)}</span>
           <span class="campus-building__meta">${floorKeysForBuilding(id).map(floorLabelFromKey).join(" · ")}</span>
@@ -8783,7 +8793,13 @@
           getTransitionAt(actor.floor, actor.x, actor.y)?.destinations.includes(
             floorId,
           );
-        return `<button type="button" data-floor="${floorId}" class="${floorId === ui.currentFloor ? "is-active" : ""}">${floorLabelFromKey(floorId)}${canTransition ? "<small>이동</small>" : ""}</button>`;
+        const classes = [
+          floorId === ui.currentFloor ? "is-active" : "",
+          actor?.floor === floorId ? "is-character-floor" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return `<button type="button" data-floor="${floorId}" class="${classes}" aria-current="${actor?.floor === floorId ? "location" : "false"}">${floorLabelFromKey(floorId)}${canTransition ? "<small>이동</small>" : ""}</button>`;
       })
       .join("");
   }
@@ -9165,9 +9181,6 @@
       ui.currentFloor = targetFloor;
       ui.mapMode = "floor";
       renderAll();
-      showToast(
-        "생환자는 공개된 지도를 열람할 수 있지만 자신의 위치는 이동하지 않습니다.",
-      );
       return;
     }
 
@@ -9347,8 +9360,13 @@
     }
 
     if (actor.role === "survivor") {
+      const isCurrentPosition =
+        actor.floor === ui.currentFloor && actor.x === x && actor.y === y;
+      if (isCurrentPosition) return;
+
       showToast(
         "생환자는 자신의 위치를 직접 옮길 수 없습니다. 운영진이 이동시킵니다.",
+        1200,
       );
       return;
     }
