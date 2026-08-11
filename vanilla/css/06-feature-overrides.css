@@ -5218,3 +5218,18 @@ body.theme-admin.theme-mode-dark .map-room__core-equipment-marker {
   background: rgba(10, 10, 10, 0.76);
   color: #f5f7f8;
 }
+
+/* =========================================================
+   캐릭터 토큰 아우라 제거
+   - 화면 전체로 확대되는 원형/점선 가상요소 제거
+   - 생환자/빙혼자 토큰 색과 선택 효과는 유지
+   - 온기 감지(.map-room.is-warm / warmth-banner)는 영향 없음
+   ========================================================= */
+
+.character-token.character-token--survivor::before,
+.character-token.character-token--spirit::before,
+body.theme-spirit .character-token.character-token--survivor::before,
+body.theme-spirit .character-token.character-token--spirit::before {
+  content: none;
+  display: none;
+}
