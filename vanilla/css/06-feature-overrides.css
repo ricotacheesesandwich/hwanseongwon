@@ -7335,3 +7335,282 @@ body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger:hover {
 .character-token__status {
   display: none;
 }
+
+/* =========================================================
+   생환자 다크모드 자료 상세 + 관리자 팀 일괄 선택
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   생환자 다크모드 - 자료 / 증거 상세 팝업 밝기
+   --------------------------------------------------------- */
+
+body.theme-survivor.theme-mode-dark .modal .evidence-detail {
+  color: #eaf3fc;
+}
+
+body.theme-survivor.theme-mode-dark .modal .evidence-detail > p {
+  color: #a9bfd4;
+}
+
+/* 첨부 이미지가 없을 때의 큰 흰 박스 */
+body.theme-survivor.theme-mode-dark .modal .evidence-detail__image {
+  border-color: #31506c;
+  background: linear-gradient(145deg, #0e253a, #081a2a);
+  color: #75b7e2;
+  box-shadow: none;
+}
+
+/* 실제 썸네일/이미지가 있는 경우의 프레임 */
+body.theme-survivor.theme-mode-dark .modal .evidence-image {
+  border-color: #31506c;
+  background: #081a2a;
+  box-shadow: none;
+}
+
+body.theme-survivor.theme-mode-dark .modal .evidence-image img {
+  background: #081a2a;
+}
+
+/* 정보 상태 / 등록·발견자 / 등록 장소 등의 밝은 카드 */
+body.theme-survivor.theme-mode-dark .modal .detail-grid > div {
+  border-color: #284863;
+  background: #0b2135;
+  color: #e8f2fb;
+  box-shadow: none;
+}
+
+body.theme-survivor.theme-mode-dark .modal .detail-grid > div span {
+  color: #84a5c2;
+}
+
+body.theme-survivor.theme-mode-dark .modal .detail-grid > div strong {
+  color: #f2f7fc;
+}
+
+/* 생환자 자료 상세 모달 하단 */
+body.theme-survivor.theme-mode-dark .modal .evidence-detail + .detail-grid {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------
+   관리자 팀 편성 - 일괄 선택 버튼
+   --------------------------------------------------------- */
+
+.team-bulk-select {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 42px;
+  gap: 8px;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-bulk-select .button {
+  border-color: #3b484e;
+  background: #141a1d;
+  color: #e8f0f2;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .modal .team-bulk-select .button:hover {
+  border-color: #536269;
+  background: #1c2529;
+  color: #ffffff;
+}
+
+/* 동결체만 */
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  [data-team-bulk-select="spirit"] {
+  border-color: #65343f;
+  background: #32171e;
+  color: #ffd8df;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  [data-team-bulk-select="spirit"]:hover {
+  border-color: #82505a;
+  background: #452129;
+  color: #ffffff;
+}
+
+/* 생환자만 */
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  [data-team-bulk-select="survivor"] {
+  border-color: #28584f;
+  background: #102b27;
+  color: #bff4df;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  [data-team-bulk-select="survivor"]:hover {
+  border-color: #39796c;
+  background: #173c35;
+  color: #ffffff;
+}
+
+@media (max-width: 620px) {
+  .team-bulk-select {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 선택 전체 해제 × 버튼 */
+.team-bulk-select__clear {
+  min-width: 42px;
+  padding-inline: 0;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  .team-bulk-select__clear {
+  border-color: #683943;
+  background: #35191f;
+  color: #ffdce2;
+}
+
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  .team-bulk-select__clear:hover {
+  border-color: #87505b;
+  background: #482229;
+  color: #ffffff;
+}
+
+@media (max-width: 620px) {
+  .team-bulk-select__clear {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   팀 편성 팝업 하단 정리 + 생환자 MY GROUPS 다크모드
+   ========================================================= */
+
+/* footer 내용이 없는 모달은 하단 빈 영역 자체를 표시하지 않음 */
+.modal__footer:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------
+   생환자 다크모드 MY GROUPS
+   --------------------------------------------------------- */
+
+body.theme-survivor.theme-mode-dark .player-profile .team-summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+/* 그룹 카드 본체 */
+body.theme-survivor.theme-mode-dark .player-profile .team-summary-card {
+  overflow: hidden;
+  border: 1px solid #284a67;
+  border-left: 4px solid var(--team-color);
+  background: #091d30;
+  color: #edf5ff;
+  box-shadow: none;
+}
+
+/* 그룹 번호 / 위치 공유 상태 */
+body.theme-survivor.theme-mode-dark .player-profile .team-summary-card__head {
+  border-bottom: 1px solid #284a67;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--team-color) 12%, transparent),
+      transparent 48%
+    ),
+    #0c2338;
+  color: #edf5ff;
+}
+
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card__head
+  strong {
+  color: #ffffff;
+}
+
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card__head
+  span {
+  color: #8fb2d1;
+}
+
+/* 흰색으로 남던 그룹원 목록 영역 */
+body.theme-survivor.theme-mode-dark .player-profile .team-member-list {
+  background: #08192a;
+}
+
+/* 무현·101 / 혜연·104 / 혜진·105 등 각 그룹원 행 */
+body.theme-survivor.theme-mode-dark .player-profile .team-member-row {
+  border-color: #203e59;
+  background: #0b2034;
+  color: #eaf3fc;
+  box-shadow: none;
+}
+
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-row
+  + .team-member-row {
+  border-top-color: #203e59;
+}
+
+body.theme-survivor.theme-mode-dark .player-profile .team-member-row:hover {
+  background: #102a43;
+}
+
+body.theme-survivor.theme-mode-dark .player-profile .team-member-row strong {
+  color: #f2f7fc;
+}
+
+body.theme-survivor.theme-mode-dark .player-profile .team-member-row small {
+  color: #88a6c1;
+}
+
+/* 그룹 아래 따로 나오는 공유 멤버 칩 */
+body.theme-survivor.theme-mode-dark .player-profile .shared-member-list {
+  background: transparent;
+}
+
+body.theme-survivor.theme-mode-dark .player-profile .shared-member-chip {
+  border: 1px solid #2b4c68;
+  background: #0a2034;
+  color: #cfe1f1;
+  box-shadow: none;
+}
+
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .shared-member-chip.is-muted {
+  border-color: #263f55;
+  background: #091a2a;
+  color: #819db5;
+}
+
+/* 위치 공유가 꺼진 그룹도 흰색으로 변하지 않게 */
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card.is-visibility-off {
+  border-color: #23394c;
+  border-left-color: color-mix(in srgb, var(--team-color) 55%, #536574);
+  background: #071624;
+  opacity: 0.78;
+}
+
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card.is-visibility-off
+  .team-summary-card__head {
+  background: #0a1927;
+}

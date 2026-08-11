@@ -965,9 +965,20 @@
             <div class="panel-card__header">새 표시 그룹 편성</div>
             <form class="panel-card__body form-stack" data-team-form>
               <input class="form-control" name="teamName" placeholder="예: A조, 임시 조사팀" maxlength="20" required />
+              <div class="team-bulk-select" aria-label="팀원 일괄 선택">
+                <button type="button" class="button button--small" data-team-bulk-select="all">모두 선택</button>
+                <button type="button" class="button button--small" data-team-bulk-select="spirit">동결체만</button>
+                <button type="button" class="button button--small" data-team-bulk-select="survivor">생환자만</button>
+                <button
+                  type="button"
+                  class="button button--small team-bulk-select__clear"
+                  data-team-bulk-select="clear"
+                  aria-label="선택 전체 해제"
+                  title="선택 전체 해제"
+                >×</button>
+              </div>
               <div class="team-checkbox-list team-checkbox-list--modal">${memberChecks}</div>
               <button class="button button--primary" type="submit">선택 인원 그룹화</button>
-              <p class="login-card__footnote">두 명 이상 선택합니다. 한 캐릭터가 여러 그룹에 동시에 속할 수 있습니다. 눈 버튼은 그룹을 해제하지 않고 원격 위치 공유만 잠시 끕니다.</p>
             </form>
           </section>
           <section class="panel-card">
@@ -976,7 +987,7 @@
           </section>
         </div>
       `,
-      footer: `<button type="button" class="button" data-modal-close>닫기</button>`,
+      footer: "",
     });
   }
 
@@ -2062,6 +2073,29 @@
     const modalTab = event.target.closest("[data-admin-modal-tab]");
     if (modalTab) {
       showAdminHubModal(modalTab.dataset.adminModalTab);
+      return;
+    }
+
+    const teamBulkSelectButton = event.target.closest(
+      "[data-team-bulk-select]",
+    );
+    if (teamBulkSelectButton) {
+      const teamForm = teamBulkSelectButton.closest("[data-team-form]");
+      if (!teamForm) return;
+
+      const scope = teamBulkSelectButton.dataset.teamBulkSelect;
+      teamForm.querySelectorAll('input[name="memberIds"]').forEach((input) => {
+        const character = getCharacter(Number(input.value));
+        if (!character) {
+          input.checked = false;
+          return;
+        }
+
+        input.checked =
+          scope === "all" ||
+          (scope === "survivor" && character.role === "survivor") ||
+          (scope === "spirit" && character.role === "spirit");
+      });
       return;
     }
 
