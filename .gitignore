@@ -1,0 +1,15 @@
+# 실제 비밀번호/학번을 넣은 개인 SQL은 커밋 금지
+supabase/sql/99_credentials_private.sql
+supabase/sql/*credentials_PRIVATE*.sql
+supabase/sql/*credentials_private*.sql
+
+# Supabase / 로컬 비밀값
+.env
+.env.*
+supabase/.env
+supabase/functions/.env
+
+# 로컬 도구/OS
+node_modules/
+.DS_Store
+Thumbs.db

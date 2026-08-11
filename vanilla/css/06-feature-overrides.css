@@ -5173,6 +5173,7 @@ body.theme-admin.theme-mode-dark
   border-left-color: #4c5a61;
 }
 
+
 /* =========================================================
    연구별관 B3 핵심설비 통로 · 동결 건조 변화기 위치 표시
    본체를 별도 방으로 나누지 않고 통로 중앙에 점선 원으로 표시
@@ -5418,14 +5419,20 @@ body.theme-admin.theme-mode-dark .theme-toggle__thumb {
    ========================================================= */
 
 /* 생환자 역할 칩 */
-body.theme-admin.theme-mode-dark .sidebar .character-card .role-chip--survivor {
+body.theme-admin.theme-mode-dark
+  .sidebar
+  .character-card
+  .role-chip--survivor {
   border-color: #28584f;
   background: #102b27;
   color: #bff4df;
 }
 
 /* 빙혼자 역할 칩 */
-body.theme-admin.theme-mode-dark .sidebar .character-card .role-chip--spirit {
+body.theme-admin.theme-mode-dark
+  .sidebar
+  .character-card
+  .role-chip--spirit {
   border-color: #65343f;
   background: #32171e;
   color: #ffd8df;
@@ -5435,8 +5442,7 @@ body.theme-admin.theme-mode-dark .sidebar .character-card .role-chip--spirit {
 body.theme-admin.theme-mode-dark
   .sidebar
   .character-card
-  .infection-complete
-  > strong {
+  .infection-complete > strong {
   border-color: #65343f;
   background: #351920;
   color: #ffd8df;
@@ -5599,13 +5605,17 @@ body.theme-admin.theme-mode-dark .selected-summary small {
 }
 
 /* 지도 하단 역할 칩도 밝은 면 제거 */
-body.theme-admin.theme-mode-dark .selected-summary .role-chip--survivor {
+body.theme-admin.theme-mode-dark
+  .selected-summary
+  .role-chip--survivor {
   border-color: #28584f;
   background: #102b27;
   color: #bff4df;
 }
 
-body.theme-admin.theme-mode-dark .selected-summary .role-chip--spirit {
+body.theme-admin.theme-mode-dark
+  .selected-summary
+  .role-chip--spirit {
   border-color: #65343f;
   background: #32171e;
   color: #ffd8df;
@@ -5618,11 +5628,7 @@ body.theme-admin.theme-mode-dark .selected-summary .role-chip--spirit {
 body.theme-admin.theme-mode-dark .operations-page {
   border-color: #30383c;
   background:
-    radial-gradient(
-      circle at top right,
-      rgba(29, 85, 102, 0.08),
-      transparent 34%
-    ),
+    radial-gradient(circle at top right, rgba(29, 85, 102, 0.08), transparent 34%),
     #080808;
   color: #eef3f5;
   box-shadow: none;
@@ -5652,9 +5658,7 @@ body.theme-admin.theme-mode-dark .operations-summary-grid article {
   box-shadow: none;
 }
 
-body.theme-admin.theme-mode-dark
-  .operations-summary-grid
-  article:nth-child(even) {
+body.theme-admin.theme-mode-dark .operations-summary-grid article:nth-child(even) {
   background: #181a1c;
 }
 
@@ -5751,24 +5755,31 @@ body.theme-admin.theme-mode-dark .spirit-state-cell small {
 }
 
 /* 운영페이지 안 역할 칩 */
-body.theme-admin.theme-mode-dark .operations-page .role-chip--survivor {
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .role-chip--survivor {
   border-color: #28584f;
   background: #102b27;
   color: #bff4df;
 }
 
-body.theme-admin.theme-mode-dark .operations-page .role-chip--spirit {
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .role-chip--spirit {
   border-color: #65343f;
   background: #32171e;
   color: #ffd8df;
 }
 
-body.theme-admin.theme-mode-dark .operations-page .infection-complete strong,
 body.theme-admin.theme-mode-dark
   .operations-page
-  .spirit-state-cell.infection-complete
-  strong,
-body.theme-admin.theme-mode-dark .operations-page .infection-complete-row em {
+  .infection-complete strong,
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .spirit-state-cell.infection-complete strong,
+body.theme-admin.theme-mode-dark
+  .operations-page
+  .infection-complete-row em {
   border-color: #65343f;
   background: #351920;
   color: #ffd8df;
@@ -6062,7 +6073,10 @@ body.theme-admin.theme-mode-dark
 
 /* 생환자 역할 칩:
    좌측 캐릭터 현황 + 지도 하단 선택 캐릭터 동일 색 */
-body.theme-admin.theme-mode-dark .sidebar .character-card .role-chip--survivor,
+body.theme-admin.theme-mode-dark
+  .sidebar
+  .character-card
+  .role-chip--survivor,
 body.theme-admin.theme-mode-dark
   .map-panel__footer
   .selected-summary
@@ -6078,7 +6092,10 @@ body.theme-admin.theme-mode-dark
 
 /* 빙혼자 역할 칩:
    좌측 캐릭터 현황 + 지도 하단 선택 캐릭터 동일 색 */
-body.theme-admin.theme-mode-dark .sidebar .character-card .role-chip--spirit,
+body.theme-admin.theme-mode-dark
+  .sidebar
+  .character-card
+  .role-chip--spirit,
 body.theme-admin.theme-mode-dark
   .map-panel__footer
   .selected-summary
@@ -6114,7 +6131,9 @@ body.theme-admin.theme-mode-dark
 }
 
 /* 지도 하단 캐릭터 정보 자체는 새 카드 틀을 만들지 않음 */
-body.theme-admin.theme-mode-dark .map-panel__footer .selected-summary {
+body.theme-admin.theme-mode-dark
+  .map-panel__footer
+  .selected-summary {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -6255,7 +6274,9 @@ body.theme-admin.theme-mode-dark
 
 /* 팀 편성 · 위치 공유 카드:
    카드 전체를 밝게 만들지 않고 왼쪽 선으로 그룹색을 명확히 구분 */
-body.theme-admin.theme-mode-dark .workspace--admin .compact-team-card {
+body.theme-admin.theme-mode-dark
+  .workspace--admin
+  .compact-team-card {
   border-color: #3b454a;
   border-left: 5px solid var(--team-color);
   background:
@@ -6265,8 +6286,8 @@ body.theme-admin.theme-mode-dark .workspace--admin .compact-team-card {
       transparent 34%
     ),
     #181818;
-  box-shadow: inset 4px 0 10px
-    color-mix(in srgb, var(--team-color) 12%, transparent);
+  box-shadow:
+    inset 4px 0 10px color-mix(in srgb, var(--team-color) 12%, transparent);
 }
 
 /* 공유 숨김 상태도 그룹색 자체는 알아볼 수 있게 유지 */
@@ -6286,8 +6307,7 @@ body.theme-admin.theme-mode-dark
 /* 팀 번호/이름도 그룹색을 살짝 반영 */
 body.theme-admin.theme-mode-dark
   .workspace--admin
-  .compact-team-card__head
-  strong {
+  .compact-team-card__head strong {
   color: color-mix(in srgb, var(--team-color) 58%, #ffffff);
 }
 
@@ -6298,11 +6318,12 @@ body.theme-admin.theme-mode-dark
   .compact-team-card__members
   button {
   border-color: color-mix(in srgb, var(--team-color) 58%, #3b4a51);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--team-color) 11%, #172126),
-    #141b1e
-  );
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--team-color) 11%, #172126),
+      #141b1e
+    );
   color: #eef6f8;
 }
 
@@ -6311,11 +6332,12 @@ body.theme-admin.theme-mode-dark
   .compact-team-card__members
   button:hover {
   border-color: color-mix(in srgb, var(--team-color) 78%, #8fa0a7);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--team-color) 19%, #1c272b),
-    #1b2327
-  );
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--team-color) 19%, #1c272b),
+      #1b2327
+    );
   color: #ffffff;
 }
 
@@ -6331,7 +6353,8 @@ body.theme-admin.theme-mode-dark
 }
 
 /* 관리페이지 등에서 동일 팀 카드가 나타날 경우에도 그룹색 유지 */
-body.theme-admin.theme-mode-dark :is(.team-summary-card, .team-admin-card) {
+body.theme-admin.theme-mode-dark
+  :is(.team-summary-card, .team-admin-card) {
   border-left: 4px solid var(--team-color);
 }
 
@@ -6374,10 +6397,7 @@ body.theme-survivor.theme-mode-dark .player-profile .status-list__item {
   padding: 0;
 }
 
-body.theme-survivor.theme-mode-dark
-  .player-profile
-  .status-list__item
-  + .status-list__item {
+body.theme-survivor.theme-mode-dark .player-profile .status-list__item + .status-list__item {
   margin-top: 6px;
 }
 
@@ -6751,7 +6771,9 @@ body.theme-survivor.theme-mode-dark .role-badge--spirit {
 }
 
 /* 라이트모드에서도 붉은 점이 밝은 카드 위에서 사라지지 않게 */
-body.theme-mode-light .campus-map-popup .campus-building__position-dot {
+body.theme-mode-light
+  .campus-map-popup
+  .campus-building__position-dot {
   border-color: #ffffff;
   box-shadow:
     0 0 0 2px rgba(177, 33, 55, 0.12),
@@ -6925,8 +6947,7 @@ body.theme-admin.theme-mode-dark
   .operations-page
   .role-settings-card--survivor
   .settings-toggle
-  input:checked
-  + span {
+  input:checked + span {
   border-color: #28695d;
   background: #155548;
 }
@@ -6935,20 +6956,17 @@ body.theme-admin.theme-mode-dark
   .operations-page
   .role-settings-card--spirit
   .settings-toggle
-  input:checked
-  + span {
+  input:checked + span {
   border-color: #7a3946;
   background: #5a2631;
 }
 
 body.theme-admin.theme-mode-dark
   .operations-page
-  .settings-toggle
-  > span::after,
+  .settings-toggle > span::after,
 body.theme-admin.theme-mode-dark
   .operations-page
-  .settings-toggle
-  > span::before {
+  .settings-toggle > span::before {
   background: #d9e2e5;
 }
 
@@ -7190,28 +7208,41 @@ body.theme-admin.theme-mode-dark .modal__footer .button:hover {
    캐릭터 관리 팝업 상단 요약
    --------------------------------------------------------- */
 
-body.theme-admin.theme-mode-dark .modal .admin-character-overview {
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview {
   border: 1px solid #394348;
   background: #17191b;
   color: #edf2f4;
   box-shadow: none;
 }
 
-body.theme-admin.theme-mode-dark .modal .admin-character-overview > div {
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview > div {
   color: #edf2f4;
 }
 
-body.theme-admin.theme-mode-dark .modal .admin-character-overview strong {
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview strong {
   color: #f5f7f8;
 }
 
-body.theme-admin.theme-mode-dark .modal .admin-character-overview > div > span,
-body.theme-admin.theme-mode-dark .modal .admin-character-overview small {
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview > div > span,
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview small {
   color: #9fadb3;
 }
 
 /* 캐릭터 관리 상단의 그룹 칩도 밝은 흰색이 되지 않게 */
-body.theme-admin.theme-mode-dark .modal .admin-character-overview .team-chip {
+body.theme-admin.theme-mode-dark
+  .modal
+  .admin-character-overview
+  .team-chip {
   border-color: #3e4b51;
   background: #172025;
   color: #e8f1f4;
@@ -7251,29 +7282,39 @@ body.theme-admin.theme-mode-dark
    팀 편성 팝업 - 현재 그룹 목록
    --------------------------------------------------------- */
 
-body.theme-admin.theme-mode-dark .modal .team-admin-card {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card {
   border-color: #3a4449;
   background: #17191b;
   color: #edf2f4;
   box-shadow: none;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-admin-card strong {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card strong {
   color: #ffffff;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-admin-card small {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card small {
   color: #9eabb1;
 }
 
 /* 도현 102 / 까순 103 / 태허 106처럼 표시되는 멤버 칩 */
-body.theme-admin.theme-mode-dark .modal .team-admin-card__members {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card__members {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-admin-card__members span {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card__members span {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
@@ -7288,7 +7329,10 @@ body.theme-admin.theme-mode-dark .modal .team-admin-card__members span {
 }
 
 /* 위치 공유 눈 버튼 - 흰색 제거 */
-body.theme-admin.theme-mode-dark .modal .team-admin-card .team-eye-button {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card
+  .team-eye-button {
   border: 1px solid #3c5159;
   background: #11191c;
   color: #dce9ed;
@@ -7314,13 +7358,19 @@ body.theme-admin.theme-mode-dark
 }
 
 /* 그룹 해제 버튼은 위험 기능답게 어두운 버건디 유지 */
-body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card
+  .button--danger {
   border-color: #6a3740;
   background: #4a2229;
   color: #fff1f3;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger:hover {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-admin-card
+  .button--danger:hover {
   border-color: #84505a;
   background: #5b2b34;
   color: #ffffff;
@@ -7344,51 +7394,70 @@ body.theme-admin.theme-mode-dark .modal .team-admin-card .button--danger:hover {
    생환자 다크모드 - 자료 / 증거 상세 팝업 밝기
    --------------------------------------------------------- */
 
-body.theme-survivor.theme-mode-dark .modal .evidence-detail {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-detail {
   color: #eaf3fc;
 }
 
-body.theme-survivor.theme-mode-dark .modal .evidence-detail > p {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-detail > p {
   color: #a9bfd4;
 }
 
 /* 첨부 이미지가 없을 때의 큰 흰 박스 */
-body.theme-survivor.theme-mode-dark .modal .evidence-detail__image {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-detail__image {
   border-color: #31506c;
-  background: linear-gradient(145deg, #0e253a, #081a2a);
+  background:
+    linear-gradient(145deg, #0e253a, #081a2a);
   color: #75b7e2;
   box-shadow: none;
 }
 
 /* 실제 썸네일/이미지가 있는 경우의 프레임 */
-body.theme-survivor.theme-mode-dark .modal .evidence-image {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-image {
   border-color: #31506c;
   background: #081a2a;
   box-shadow: none;
 }
 
-body.theme-survivor.theme-mode-dark .modal .evidence-image img {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-image img {
   background: #081a2a;
 }
 
 /* 정보 상태 / 등록·발견자 / 등록 장소 등의 밝은 카드 */
-body.theme-survivor.theme-mode-dark .modal .detail-grid > div {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .detail-grid > div {
   border-color: #284863;
   background: #0b2135;
   color: #e8f2fb;
   box-shadow: none;
 }
 
-body.theme-survivor.theme-mode-dark .modal .detail-grid > div span {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .detail-grid > div span {
   color: #84a5c2;
 }
 
-body.theme-survivor.theme-mode-dark .modal .detail-grid > div strong {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .detail-grid > div strong {
   color: #f2f7fc;
 }
 
 /* 생환자 자료 상세 모달 하단 */
-body.theme-survivor.theme-mode-dark .modal .evidence-detail + .detail-grid {
+body.theme-survivor.theme-mode-dark
+  .modal
+  .evidence-detail + .detail-grid {
   background: transparent;
 }
 
@@ -7402,14 +7471,20 @@ body.theme-survivor.theme-mode-dark .modal .evidence-detail + .detail-grid {
   gap: 8px;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-bulk-select .button {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  .button {
   border-color: #3b484e;
   background: #141a1d;
   color: #e8f0f2;
   box-shadow: none;
 }
 
-body.theme-admin.theme-mode-dark .modal .team-bulk-select .button:hover {
+body.theme-admin.theme-mode-dark
+  .modal
+  .team-bulk-select
+  .button:hover {
   border-color: #536269;
   background: #1c2529;
   color: #ffffff;
@@ -7504,13 +7579,17 @@ body.theme-admin.theme-mode-dark
    생환자 다크모드 MY GROUPS
    --------------------------------------------------------- */
 
-body.theme-survivor.theme-mode-dark .player-profile .team-summary-list {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-list {
   display: grid;
   gap: 10px;
 }
 
 /* 그룹 카드 본체 */
-body.theme-survivor.theme-mode-dark .player-profile .team-summary-card {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card {
   overflow: hidden;
   border: 1px solid #284a67;
   border-left: 4px solid var(--team-color);
@@ -7520,7 +7599,9 @@ body.theme-survivor.theme-mode-dark .player-profile .team-summary-card {
 }
 
 /* 그룹 번호 / 위치 공유 상태 */
-body.theme-survivor.theme-mode-dark .player-profile .team-summary-card__head {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-summary-card__head {
   border-bottom: 1px solid #284a67;
   background:
     linear-gradient(
@@ -7534,25 +7615,27 @@ body.theme-survivor.theme-mode-dark .player-profile .team-summary-card__head {
 
 body.theme-survivor.theme-mode-dark
   .player-profile
-  .team-summary-card__head
-  strong {
+  .team-summary-card__head strong {
   color: #ffffff;
 }
 
 body.theme-survivor.theme-mode-dark
   .player-profile
-  .team-summary-card__head
-  span {
+  .team-summary-card__head span {
   color: #8fb2d1;
 }
 
 /* 흰색으로 남던 그룹원 목록 영역 */
-body.theme-survivor.theme-mode-dark .player-profile .team-member-list {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-list {
   background: #08192a;
 }
 
 /* 무현·101 / 혜연·104 / 혜진·105 등 각 그룹원 행 */
-body.theme-survivor.theme-mode-dark .player-profile .team-member-row {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-row {
   border-color: #203e59;
   background: #0b2034;
   color: #eaf3fc;
@@ -7561,29 +7644,38 @@ body.theme-survivor.theme-mode-dark .player-profile .team-member-row {
 
 body.theme-survivor.theme-mode-dark
   .player-profile
-  .team-member-row
-  + .team-member-row {
+  .team-member-row + .team-member-row {
   border-top-color: #203e59;
 }
 
-body.theme-survivor.theme-mode-dark .player-profile .team-member-row:hover {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-row:hover {
   background: #102a43;
 }
 
-body.theme-survivor.theme-mode-dark .player-profile .team-member-row strong {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-row strong {
   color: #f2f7fc;
 }
 
-body.theme-survivor.theme-mode-dark .player-profile .team-member-row small {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .team-member-row small {
   color: #88a6c1;
 }
 
 /* 그룹 아래 따로 나오는 공유 멤버 칩 */
-body.theme-survivor.theme-mode-dark .player-profile .shared-member-list {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .shared-member-list {
   background: transparent;
 }
 
-body.theme-survivor.theme-mode-dark .player-profile .shared-member-chip {
+body.theme-survivor.theme-mode-dark
+  .player-profile
+  .shared-member-chip {
   border: 1px solid #2b4c68;
   background: #0a2034;
   color: #cfe1f1;
@@ -7613,4 +7705,20 @@ body.theme-survivor.theme-mode-dark
   .team-summary-card.is-visibility-off
   .team-summary-card__head {
   background: #0a1927;
+}
+
+
+/* =========================================================
+   Supabase 비밀번호 로그인
+   ========================================================= */
+.login-security-note {
+  margin: 10px 0 0;
+  color: #6d7883;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.login-form__row button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }

@@ -30,19 +30,20 @@
         </div>
 
         <form id="characterLoginForm" class="login-form login-form--search">
-          <label for="characterIdInput">접속 ID 검색</label>
+          <label for="accessPasswordInput">접속 비밀번호</label>
           <div class="login-form__row">
             <input
-              id="characterIdInput"
-              name="characterId"
-              inputmode="numeric"
-              autocomplete="off"
-              maxlength="4"
-              placeholder="ID를 입력하세요"
+              id="accessPasswordInput"
+              name="accessPassword"
+              type="password"
+              autocomplete="current-password"
+              maxlength="72"
+              placeholder="지정받은 비밀번호를 입력하세요"
               required
             />
-            <button type="submit" class="button button--primary">검색</button>
+            <button type="submit" class="button button--primary">접속</button>
           </div>
+          <p class="login-security-note">비밀번호는 서버에서 확인되며 캐릭터 번호·이메일 입력은 필요하지 않습니다.</p>
           <p id="loginError" class="form-message" role="alert"></p>
         </form>
 
@@ -70,14 +71,14 @@
             id="adminOperationsButton"
             type="button"
             class="button button--operations admin-only"
-            aria-label="관리페이지로 이동"
+            aria-label="관리 페이지로 이동"
           >
-            관리페이지
+            관리 페이지
           </button>
-          <div id="sessionBadge" class="session-badge"></div>
           <button id="eventButton" type="button" class="event-button">
             <span aria-hidden="true">!</span> 긴급 이벤트 0건
           </button>
+          <div id="sessionBadge" class="session-badge"></div>
         </div>
 
         <div class="topbar__actions">
@@ -92,9 +93,9 @@
             <span class="theme-toggle__track" aria-hidden="true">
               <span class="theme-toggle__thumb"></span>
             </span>
-            <span id="themeToggleLabel" class="theme-toggle__label">
-              라이트
-            </span>
+            <span id="themeToggleLabel" class="theme-toggle__label"
+              >라이트</span
+            >
           </button>
 
           <button
@@ -124,7 +125,7 @@
                   생환자 시점
                 </button>
                 <button type="button" data-view-mode="spirit">
-                  동결체 시점
+                  빙혼자 시점
                 </button>
                 <button type="button" data-view-mode="admin" class="is-active">
                   관리자 시점
@@ -155,7 +156,7 @@
                   class="button button--map"
                   aria-label="학술원 전체 지도로 이동"
                 >
-                  전체지도
+                  지도
                 </button>
               </div>
             </div>
@@ -183,18 +184,18 @@
               class="selected-summary"
             ></article>
             <div class="map-legend" aria-label="지도 범례">
-              <span>
-                <i class="legend-box legend-box--visible"></i>현재 위치한 공간
-              </span>
-              <span>
-                <i class="legend-dot legend-dot--blue"></i>같은 공간 · 표시 그룹
-              </span>
-              <span>
-                <i class="legend-box legend-box--danger"></i>위험구역
-              </span>
+              <span
+                ><i class="legend-box legend-box--visible"></i>현재 위치한
+                공간</span
+              >
+              <span
+                ><i class="legend-dot legend-dot--blue"></i>같은 공간 · 표시
+                그룹</span
+              >
+              <span><i class="legend-box legend-box--danger"></i>위험구역</span>
             </div>
             <p id="movementRule" class="movement-rule">
-              동결체 · 공간 변경 1회 = 행동력 1
+              빙혼자 · 공간 변경 1회 = 행동력 1
             </p>
           </div>
         </section>
@@ -282,7 +283,8 @@
         <p>표시할 기록이 없습니다.</p>
       </div>
     </template>
-
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./js/supabase-config.js"></script>
     <script src="./js/app.js" defer></script>
   </body>
 </html>

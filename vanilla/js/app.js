@@ -89,6 +89,15 @@
     "BroadcastChannel" in window
       ? new BroadcastChannel("shu-investigation-sync")
       : null;
+  const supabaseClient = window.shuSupabase || null;
+  const remoteConfig = window.SHU_SUPABASE_CONFIG || null;
+  const REMOTE_SESSION_KEY = "shu-remote-game-session";
+  const remoteState = {
+    version: 0,
+    applying: false,
+    writeQueue: Promise.resolve(),
+    realtimeChannel: null,
+  };
 
   let session = null;
   let state = ensureFeatureState(loadState());
@@ -113,12 +122,21 @@
 
   document.addEventListener("DOMContentLoaded", init);
 
-  function init() {
+  async function init() {
     cacheElements();
     bindStaticEvents();
     bindRealtimeSync();
     state = ensureFeatureState(state);
-    showLogin();
+
+    if (!isRemoteConfigured()) {
+      showLogin();
+      elements.loginError.textContent =
+        "Supabase 연결 설정이 필요합니다. supabase-config.js를 먼저 설정해 주세요.";
+      return;
+    }
+
+    const restored = await tryRestoreRemoteSession();
+    if (!restored) showLogin();
   }
 
   function cacheElements() {
@@ -126,7 +144,7 @@
     elements.appView = document.querySelector("#appView");
     elements.workspace = document.querySelector("#workspace");
     elements.characterLoginForm = document.querySelector("#characterLoginForm");
-    elements.characterIdInput = document.querySelector("#characterIdInput");
+    elements.accessPasswordInput = document.querySelector("#accessPasswordInput");
     elements.loginError = document.querySelector("#loginError");
     elements.loginSearchResult = document.querySelector("#loginSearchResult");
     elements.logoutButton = document.querySelector("#logoutButton");
@@ -188,16 +206,6 @@
       "submit",
       handleCharacterLogin,
     );
-    elements.loginSearchResult.addEventListener("click", (event) => {
-      const playerButton = event.target.closest(
-        "[data-confirm-character-login]",
-      );
-      if (playerButton) {
-        loginAsCharacter(Number(playerButton.dataset.confirmCharacterLogin));
-        return;
-      }
-      if (event.target.closest("[data-confirm-admin-login]")) loginAsAdmin();
-    });
     elements.logoutButton.addEventListener("click", logout);
     elements.themeToggleButton?.addEventListener("click", toggleThemeMode);
     elements.eventButton.addEventListener("click", showEmergencyEvent);
@@ -245,81 +253,206 @@
     });
   }
 
+  function isRemoteConfigured() {
+    return Boolean(remoteConfig?.configured && supabaseClient);
+  }
+
+  async function remoteApi(action, payload = {}, tokenOverride = null) {
+    if (!isRemoteConfigured()) {
+      throw new Error("SUPABASE_NOT_CONFIGURED");
+    }
+
+    const token = tokenOverride ?? session?.token ?? "";
+    const response = await fetch(
+      `${remoteConfig.url}/functions/v1/${remoteConfig.functionName}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: remoteConfig.publishableKey,
+          Authorization: `Bearer ${remoteConfig.publishableKey}`,
+        },
+        body: JSON.stringify({ action, token, ...payload }),
+      },
+    );
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (error) {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const message = data?.message || data?.error || `HTTP_${response.status}`;
+      const remoteError = new Error(message);
+      remoteError.status = response.status;
+      remoteError.code = data?.code || null;
+      throw remoteError;
+    }
+
+    return data;
+  }
+
   function bindRealtimeSync() {
     syncChannel?.addEventListener("message", (event) => {
       if (event.data?.type !== "state-update" || !event.data.state) return;
-      state = event.data.state;
+      if (session?.token) return;
+      state = ensureFeatureState(event.data.state);
       if (session) renderAll();
     });
 
     window.addEventListener("storage", (event) => {
-      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      if (event.key !== STORAGE_KEY || !event.newValue || session?.token) return;
       try {
-        state = JSON.parse(event.newValue);
+        state = ensureFeatureState(JSON.parse(event.newValue));
         if (session) renderAll();
       } catch (error) {
         console.warn("동기화 데이터를 읽지 못했습니다.", error);
       }
     });
+
+    if (!supabaseClient) return;
+
+    remoteState.realtimeChannel = supabaseClient
+      .channel("shu-game-state-events")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "game_state_events",
+        },
+        async (payload) => {
+          const incomingVersion = Number(payload.new?.version || 0);
+          if (!session?.token || incomingVersion <= remoteState.version) return;
+          await refreshRemoteState({ quiet: true });
+        },
+      )
+      .subscribe();
   }
 
-  function renderLoginSearchResult(code) {
-    elements.loginError.textContent = "";
-    if (code === "0000") {
-      ui.pendingLogin = { type: "admin" };
-      elements.loginSearchResult.innerHTML = `
-        <article class="login-result-card">
-          <div class="login-result-card__icon">ADMIN</div>
-          <div>
-            <p class="eyebrow">OPERATIONS ACCOUNT</p>
-            <h2>운영진 관리 화면</h2>
-            <p>모든 캐릭터, 팀, 위치와 조사 정보를 관리합니다.</p>
-          </div>
-          <button type="button" class="button button--admin" data-confirm-admin-login>관리자 접속</button>
-        </article>`;
-      return;
-    }
-
-    const character = getCharacter(Number(code));
-    if (!character) {
-      ui.pendingLogin = null;
-      elements.loginSearchResult.innerHTML = "";
-      elements.loginError.textContent = "등록된 ID를 찾을 수 없습니다.";
-      return;
-    }
-
-    const teams = getTeamsForCharacter(character.id);
-    ui.pendingLogin = { type: "player", characterId: character.id };
-    elements.loginSearchResult.innerHTML = `
-      <article class="login-result-card">
-        ${avatarMarkup(character)}
-        <div>
-          <p class="eyebrow">CHARACTER FOUND</p>
-          <h2>${escapeHtml(character.name)} · ID ${character.id}</h2>
-          <p>${ROLE_LABELS[character.role]}${teams.length ? ` · ${teams.map((team) => escapeHtml(team.name)).join(" · ")}` : " · 미편성"}</p>
-        </div>
-        <button type="button" class="button button--primary" data-confirm-character-login="${character.id}">이 캐릭터로 접속</button>
-      </article>`;
-  }
-
-  function handleCharacterLogin(event) {
+  async function handleCharacterLogin(event) {
     event.preventDefault();
-    const code = elements.characterIdInput.value.trim();
-    if (!/^\d{3,4}$/.test(code)) {
-      elements.loginSearchResult.innerHTML = "";
-      elements.loginError.textContent = "숫자로 된 접속 ID를 입력해 주세요.";
+    elements.loginError.textContent = "";
+    elements.loginSearchResult.innerHTML = "";
+
+    const password = elements.accessPasswordInput.value;
+    if (!password) {
+      elements.loginError.textContent = "접속 비밀번호를 입력해 주세요.";
       return;
     }
-    renderLoginSearchResult(code);
+
+    const submitButton = elements.characterLoginForm.querySelector(
+      'button[type="submit"]',
+    );
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "확인 중…";
+    }
+
+    try {
+      const result = await remoteApi("login", { password }, "");
+      elements.accessPasswordInput.value = "";
+
+      if (!result?.token || !result?.account) {
+        throw new Error("LOGIN_RESPONSE_INVALID");
+      }
+
+      sessionStorage.setItem(REMOTE_SESSION_KEY, result.token);
+
+      let remotePayload = result;
+      if (!result.state) {
+        if (result.account.type !== "admin") {
+          sessionStorage.removeItem(REMOTE_SESSION_KEY);
+          elements.loginError.textContent =
+            "게임 서버가 아직 초기화되지 않았습니다. 운영진이 먼저 로그인해 주세요.";
+          return;
+        }
+
+        remotePayload = await remoteApi(
+          "bootstrap",
+          {
+            initialState: ensureFeatureState(state),
+            mapRules: createServerMapRules(),
+          },
+          result.token,
+        );
+      }
+
+      enterRemoteSession(
+        result.account,
+        result.token,
+        remotePayload.state,
+        remotePayload.version,
+      );
+    } catch (error) {
+      console.error("로그인 실패", error);
+      if (error.status === 429) {
+        elements.loginError.textContent =
+          "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+      } else if (error.status === 401) {
+        elements.loginError.textContent = "등록되지 않은 비밀번호입니다.";
+      } else if (error.message === "SUPABASE_NOT_CONFIGURED") {
+        elements.loginError.textContent =
+          "Supabase 연결 설정이 완료되지 않았습니다.";
+      } else {
+        elements.loginError.textContent =
+          "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "접속";
+      }
+    }
   }
 
-  function loginAsCharacter(id) {
+  async function tryRestoreRemoteSession() {
+    const token = sessionStorage.getItem(REMOTE_SESSION_KEY);
+    if (!token || !isRemoteConfigured()) return false;
+
+    try {
+      const result = await remoteApi("resume", {}, token);
+      if (!result?.account || !result?.state) throw new Error("INVALID_SESSION");
+      enterRemoteSession(
+        result.account,
+        token,
+        result.state,
+        result.version,
+      );
+      return true;
+    } catch (error) {
+      sessionStorage.removeItem(REMOTE_SESSION_KEY);
+      return false;
+    }
+  }
+
+  function enterRemoteSession(account, token, remoteGameState, version) {
+    remoteState.applying = true;
+    try {
+      state = ensureFeatureState(remoteGameState);
+      remoteState.version = Number(version || 0);
+      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } finally {
+      remoteState.applying = false;
+    }
+
+    if (account.type === "admin") {
+      loginAsAdmin(token);
+      return;
+    }
+
+    loginAsCharacter(Number(account.characterId), token);
+  }
+
+  function loginAsCharacter(id, token = null) {
     const character = getCharacter(id);
     if (!character) {
       elements.loginError.textContent = "등록된 캐릭터가 아닙니다.";
       return;
     }
-    session = { type: "player", characterId: character.id };
+    session = { type: "player", characterId: character.id, token };
     ui.themeMode = loadAccountTheme();
     ui.selectedCharacterId = character.id;
     ui.currentFloor = character.floor;
@@ -334,8 +467,8 @@
     openApp();
   }
 
-  function loginAsAdmin() {
-    session = { type: "admin" };
+  function loginAsAdmin(token = null) {
+    session = { type: "admin", token };
     ui.themeMode = loadAccountTheme();
     const selected =
       getCharacter(ui.selectedCharacterId) || state.characters[0];
@@ -351,7 +484,13 @@
   }
 
   function logout() {
+    const token = session?.token;
+    if (token) {
+      remoteApi("logout", {}, token).catch(() => {});
+    }
+    sessionStorage.removeItem(REMOTE_SESSION_KEY);
     session = null;
+    remoteState.version = 0;
     ui.adminTool = null;
     ui.operationsOpen = false;
     closeModal();
@@ -374,7 +513,7 @@
 
     elements.loginView.classList.remove("is-hidden");
     elements.appView.classList.add("is-hidden");
-    elements.characterIdInput.value = "";
+    elements.accessPasswordInput.value = "";
     elements.loginSearchResult.innerHTML = "";
     elements.loginError.textContent = "";
     ui.pendingLogin = null;
@@ -1932,7 +2071,12 @@
       );
   }
 
-  function commitActorMove(actor, targetX, targetY, cost) {
+  async function commitActorMove(actor, targetX, targetY, cost) {
+    if (session?.type === "player" && session?.token) {
+      await performRemoteSpiritMove(actor, actor.floor, targetX, targetY);
+      return;
+    }
+
     if (actor.ap < cost) {
       closeModal();
       showToast("행동력이 변경되어 이동할 수 없습니다.");
@@ -1968,7 +2112,12 @@
     );
   }
 
-  function completeInvestigation(actor, investigation) {
+  async function completeInvestigation(actor, investigation) {
+    if (session?.type === "player" && session?.token) {
+      await performRemoteInvestigation(investigation.id);
+      return;
+    }
+
     actor.investigations.push(investigation.id);
     const uid = `${actor.id}-${investigation.id}`;
     actor.inventory.push({
@@ -2076,26 +2225,26 @@
       return;
     }
 
-    const teamBulkSelectButton = event.target.closest(
-      "[data-team-bulk-select]",
-    );
+    const teamBulkSelectButton = event.target.closest("[data-team-bulk-select]");
     if (teamBulkSelectButton) {
       const teamForm = teamBulkSelectButton.closest("[data-team-form]");
       if (!teamForm) return;
 
       const scope = teamBulkSelectButton.dataset.teamBulkSelect;
-      teamForm.querySelectorAll('input[name="memberIds"]').forEach((input) => {
-        const character = getCharacter(Number(input.value));
-        if (!character) {
-          input.checked = false;
-          return;
-        }
+      teamForm
+        .querySelectorAll('input[name="memberIds"]')
+        .forEach((input) => {
+          const character = getCharacter(Number(input.value));
+          if (!character) {
+            input.checked = false;
+            return;
+          }
 
-        input.checked =
-          scope === "all" ||
-          (scope === "survivor" && character.role === "survivor") ||
-          (scope === "spirit" && character.role === "spirit");
-      });
+          input.checked =
+            scope === "all" ||
+            (scope === "survivor" && character.role === "survivor") ||
+            (scope === "spirit" && character.role === "spirit");
+        });
       return;
     }
 
@@ -2163,32 +2312,22 @@
       return;
     }
 
-    const editManualStatusButton = event.target.closest(
-      "[data-edit-manual-status]",
-    );
+    const editManualStatusButton = event.target.closest("[data-edit-manual-status]");
     if (editManualStatusButton) {
       const character = getCharacter(ui.selectedCharacterId);
       if (!character) return;
-      showCharacterStatusEditorModal(
-        character.id,
-        editManualStatusButton.dataset.editManualStatus,
-      );
+      showCharacterStatusEditorModal(character.id, editManualStatusButton.dataset.editManualStatus);
       return;
     }
 
-    const removeManualStatusButton = event.target.closest(
-      "[data-remove-manual-status]",
-    );
+    const removeManualStatusButton = event.target.closest("[data-remove-manual-status]");
     if (removeManualStatusButton) {
       const character = getCharacter(ui.selectedCharacterId);
       if (!character) return;
       character.manualStatuses = (character.manualStatuses || []).filter(
-        (status) =>
-          status.id !== removeManualStatusButton.dataset.removeManualStatus,
+        (status) => status.id !== removeManualStatusButton.dataset.removeManualStatus,
       );
-      addLog(
-        `관리자가 ${character.name}의 관리자 추가 상태이상을 삭제했습니다.`,
-      );
+      addLog(`관리자가 ${character.name}의 관리자 추가 상태이상을 삭제했습니다.`);
       persistState();
       renderAll();
       if (ui.operationsOpen) renderAdminOperationsPage();
@@ -2332,9 +2471,7 @@
   }
 
   function handleRightSidebarSubmit(event) {
-    const characterStatusForm = event.target.closest(
-      "[data-character-status-form]",
-    );
+    const characterStatusForm = event.target.closest("[data-character-status-form]");
     if (characterStatusForm) {
       event.preventDefault();
       if (session?.type !== "admin") return;
@@ -2347,20 +2484,15 @@
         showToast("다친 부위와 정도를 입력해 주세요.");
         return;
       }
-      if (!Array.isArray(character.manualStatuses))
-        character.manualStatuses = [];
+      if (!Array.isArray(character.manualStatuses)) character.manualStatuses = [];
       const statusId = String(formData.get("statusId") || "");
-      const existingStatus = character.manualStatuses.find(
-        (status) => status.id === statusId,
-      );
+      const existingStatus = character.manualStatuses.find((status) => status.id === statusId);
       if (existingStatus) {
         existingStatus.bodyPart = bodyPart;
         existingStatus.severity = severity;
         existingStatus.detail = detail;
         existingStatus.updatedAt = new Date().toISOString();
-        addLog(
-          `관리자가 ${character.name}의 상태이상 「${bodyPart} · ${severity}」을(를) 수정했습니다.`,
-        );
+        addLog(`관리자가 ${character.name}의 상태이상 「${bodyPart} · ${severity}」을(를) 수정했습니다.`);
       } else {
         character.manualStatuses.push({
           id: `manual-status-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -2369,9 +2501,7 @@
           detail,
           createdAt: new Date().toISOString(),
         });
-        addLog(
-          `관리자가 ${character.name}에게 상태이상 「${bodyPart} · ${severity}」을(를) 추가했습니다.`,
-        );
+        addLog(`관리자가 ${character.name}에게 상태이상 「${bodyPart} · ${severity}」을(를) 추가했습니다.`);
       }
       persistState();
       renderAll();
@@ -2711,6 +2841,14 @@
     }
 
     const roomId = getRoomId(character.floor, character.x, character.y);
+    if (
+      session?.type === "player" &&
+      Number(state?._viewerSignals?.characterId) === Number(character.id)
+    ) {
+      const count = Number(state._viewerSignals.warmthCount || 0);
+      return { active: count > 0, count, roomId };
+    }
+
     const survivors = state.characters.filter(
       (candidate) =>
         candidate.role === "survivor" &&
@@ -2939,6 +3077,185 @@
   function persistState() {
     storage.setItem(STORAGE_KEY, JSON.stringify(state));
     syncChannel?.postMessage({ type: "state-update", state });
+
+    if (!session?.token || !isRemoteConfigured() || remoteState.applying) return;
+
+    const snapshot = JSON.parse(JSON.stringify(state));
+    remoteState.writeQueue = remoteState.writeQueue
+      .then(async () => {
+        try {
+          if (session?.type === "admin") {
+            const result = await remoteApi("save-state", {
+              state: snapshot,
+              expectedVersion: remoteState.version,
+            });
+            remoteState.version = Number(result.version || remoteState.version);
+            return;
+          }
+
+          const result = await remoteApi("save-player-state", {
+            state: snapshot,
+          });
+          remoteState.version = Number(result.version || remoteState.version);
+        } catch (error) {
+          console.error("서버 상태 저장 실패", error);
+          if (error.status === 409) {
+            await refreshRemoteState({ quiet: true });
+            showToast(
+              "다른 사용자의 변경이 먼저 반영되어 최신 상태를 다시 불러왔습니다. 방금 작업을 다시 확인해 주세요.",
+              4500,
+            );
+            return;
+          }
+          showToast("서버 저장에 실패했습니다. 네트워크 연결을 확인해 주세요.", 4200);
+        }
+      })
+      .catch((error) => console.error("원격 저장 큐 오류", error));
+  }
+
+  async function refreshRemoteState({ quiet = false } = {}) {
+    if (!session?.token) return false;
+    try {
+      const result = await remoteApi("get-state");
+      if (!result?.state) return false;
+      remoteState.applying = true;
+      try {
+        state = ensureFeatureState(result.state);
+        remoteState.version = Number(result.version || 0);
+        storage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } finally {
+        remoteState.applying = false;
+      }
+      if (session) renderAll();
+      return true;
+    } catch (error) {
+      console.error("최신 서버 상태 조회 실패", error);
+      if (!quiet) showToast("최신 서버 상태를 불러오지 못했습니다.");
+      return false;
+    }
+  }
+
+  async function performRemoteSpiritMove(character, targetFloor, x = null, y = null) {
+    if (!session?.token || session.type !== "player") return false;
+    try {
+      const result = await remoteApi("move-spirit", {
+        targetFloor,
+        targetX: Number.isInteger(x) ? x : null,
+        targetY: Number.isInteger(y) ? y : null,
+      });
+      if (!result?.state) throw new Error("MOVE_RESPONSE_INVALID");
+
+      remoteState.applying = true;
+      try {
+        state = ensureFeatureState(result.state);
+        remoteState.version = Number(result.version || 0);
+        storage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } finally {
+        remoteState.applying = false;
+      }
+
+      const moved = getCharacter(session.characterId);
+      if (moved) {
+        ui.currentFloor = moved.floor;
+        ui.currentBuilding = buildingFromFloorKey(moved.floor);
+        ui.mapMode = "floor";
+      }
+      closeModal();
+      renderAll();
+      showToast(
+        result.cost > 0
+          ? `행동력 ${result.cost}을 사용해 이동했습니다.`
+          : "같은 공간 안에서 이동했습니다.",
+      );
+      return true;
+    } catch (error) {
+      console.error("서버 이동 처리 실패", error);
+      await refreshRemoteState({ quiet: true });
+      closeModal();
+      if (error.status === 403) {
+        showToast("이 계정으로는 해당 이동을 할 수 없습니다.");
+      } else if (error.code === "NOT_ENOUGH_AP") {
+        showToast("행동력이 부족합니다.");
+      } else if (error.code === "INVALID_MOVE") {
+        showToast("현재 위치에서는 해당 공간으로 이동할 수 없습니다.");
+      } else {
+        showToast("이동 처리에 실패했습니다. 최신 상태를 확인해 주세요.");
+      }
+      return false;
+    }
+  }
+
+  async function performRemoteInvestigation(investigationId) {
+    if (!session?.token || session.type !== "player") return false;
+    try {
+      const result = await remoteApi("investigate", { investigationId });
+      if (!result?.state) throw new Error("INVESTIGATION_RESPONSE_INVALID");
+      remoteState.applying = true;
+      try {
+        state = ensureFeatureState(result.state);
+        remoteState.version = Number(result.version || 0);
+        storage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } finally {
+        remoteState.applying = false;
+      }
+      closeModal();
+      renderAll();
+      showToast(`자료 「${result.evidenceTitle || "조사자료"}」을(를) 획득했습니다.`);
+      return true;
+    } catch (error) {
+      console.error("서버 조사 처리 실패", error);
+      await refreshRemoteState({ quiet: true });
+      closeModal();
+      if (error.code === "INVALID_INVESTIGATION") {
+        showToast("현재 위치에서는 이 조사를 진행할 수 없습니다.");
+      } else if (error.code === "ALREADY_INVESTIGATED") {
+        showToast("이미 완료한 조사입니다.");
+      } else {
+        showToast("조사 처리에 실패했습니다. 최신 상태를 확인해 주세요.");
+      }
+      return false;
+    }
+  }
+
+  function createServerMapRules() {
+    const floors = {};
+    Object.entries(FLOOR_DEFINITIONS).forEach(([floorId, floor]) => {
+      floors[floorId] = {
+        cells: Object.fromEntries(
+          Object.entries(floor.cells).map(([key, cell]) => [
+            key,
+            {
+              roomId: cell.roomId,
+              roomLabel: cell.roomLabel,
+            },
+          ]),
+        ),
+        doorways: [...floor.doorways],
+        transitions: (floor.transitions || []).map((transition) => ({
+          x: transition.x,
+          y: transition.y,
+          type: transition.type,
+          destinations: [...(transition.destinations || [])],
+        })),
+        investigations: (floor.investigations || []).map((item) => ({
+          id: item.id,
+          floor: item.floor,
+          x: item.x,
+          y: item.y,
+          title: item.title,
+          evidenceTitle: item.evidenceTitle,
+          result: item.result,
+          certainty: item.certainty,
+        })),
+      };
+    });
+
+    return {
+      schema: 1,
+      columns: GRID_COLUMNS,
+      rows: GRID_ROWS,
+      floors,
+    };
   }
 
   function loadState() {
@@ -5679,13 +5996,9 @@
       renderEventButton();
       return;
     }
-    const statusEditButton = event.target.closest(
-      "[data-edit-character-status]",
-    );
+    const statusEditButton = event.target.closest("[data-edit-character-status]");
     if (statusEditButton) {
-      showCharacterStatusEditorModal(
-        Number(statusEditButton.dataset.editCharacterStatus),
-      );
+      showCharacterStatusEditorModal(Number(statusEditButton.dataset.editCharacterStatus));
       return;
     }
     const characterButton = event.target.closest("[data-operations-character]");
@@ -6489,8 +6802,7 @@
       if ("online" in character) delete character.online;
       if (!Array.isArray(character.inventory)) character.inventory = [];
       if (!Array.isArray(character.statuses)) character.statuses = [];
-      if (!Array.isArray(character.manualStatuses))
-        character.manualStatuses = [];
+      if (!Array.isArray(character.manualStatuses)) character.manualStatuses = [];
       if (!Array.isArray(character.records)) character.records = [];
       if (!Array.isArray(character.investigations))
         character.investigations = [];
@@ -6544,8 +6856,19 @@
       return { active: false, count: 0, roomId: null };
     }
     const floor = floorOverride || character.floor;
-    const roomId = roomOverride || getRoomId(floor, character.x, character.y);
+    const roomId =
+      roomOverride || getRoomId(floor, character.x, character.y);
     if (!roomId) return { active: false, count: 0, roomId: null };
+
+    if (
+      session?.type === "player" &&
+      Number(state?._viewerSignals?.characterId) === Number(character.id) &&
+      floor === character.floor &&
+      roomId === getRoomId(character.floor, character.x, character.y)
+    ) {
+      const count = Number(state._viewerSignals.coldContactCount || 0);
+      return { active: count > 0, count, roomId };
+    }
 
     const spirits = state.characters.filter(
       (candidate) =>
@@ -6749,14 +7072,10 @@
       if (character?.role === "survivor")
         node.style.width = `${Math.min(100, (effectiveFreezeHours(character) / INFECTION_TOTAL_HOURS) * 100)}%`;
     });
-    document
-      .querySelectorAll("[data-character-status-effects]")
-      .forEach((node) => {
-        const character = getCharacter(
-          Number(node.dataset.characterStatusEffects),
-        );
-        if (character) node.innerHTML = renderCharacterStatusEffects(character);
-      });
+    document.querySelectorAll("[data-character-status-effects]").forEach((node) => {
+      const character = getCharacter(Number(node.dataset.characterStatusEffects));
+      if (character) node.innerHTML = renderCharacterStatusEffects(character);
+    });
   }
 
   function isRedLikeColorV3(color) {
@@ -6794,7 +7113,9 @@
       session?.type === "admin" ||
       (session?.type === "player" && session.characterId === character.id);
     const coldMarkup =
-      character.role === "survivor" && coldContact.active && canShowColdMarker
+      character.role === "survivor" &&
+      coldContact.active &&
+      canShowColdMarker
         ? `<i class="character-token__cold-mark" title="한기" aria-label="한기">氷</i>`
         : "";
     return `<span class="character-token character-token--${character.role} ${team && character.role === "survivor" ? "is-team-colored" : ""} ${selected ? "is-selected" : ""} ${coldContact.active ? "has-cold-contact" : ""}" data-token-character="${character.id}" style="--token-color:${tokenColor};--token-dark:${tokenDark}" title="${escapeHtml(character.name)} · ${character.id} · ${ROLE_LABELS[character.role]}${teamTitle}"><span class="character-token__name">${escapeHtml(character.name)}</span>${coldMarkup}</span>`;
@@ -7066,11 +7387,9 @@
 
   function renderCharacterStatusEffects(character) {
     const statusLabels = [
-      ...(character.role === "survivor"
-        ? getInfectionStageEffects(character)
-        : []),
-      ...(character.manualStatuses || []).map((status) =>
-        `${status.bodyPart} ${status.severity}`.trim(),
+      ...(character.role === "survivor" ? getInfectionStageEffects(character) : []),
+      ...(character.manualStatuses || []).map(
+        (status) => `${status.bodyPart} ${status.severity}`.trim(),
       ),
     ].filter(Boolean);
 
@@ -7090,23 +7409,17 @@
     if (!Array.isArray(character.manualStatuses)) character.manualStatuses = [];
 
     const editingStatus = editStatusId
-      ? character.manualStatuses.find((status) => status.id === editStatusId) ||
-        null
+      ? character.manualStatuses.find((status) => status.id === editStatusId) || null
       : null;
     const currentStatuses = character.manualStatuses.length
       ? character.manualStatuses
-          .map(
-            (status) =>
-              `<div class="status-list__item"><div><strong>${escapeHtml(status.bodyPart)} ${escapeHtml(status.severity)}</strong><p>${escapeHtml(status.detail || "상세 내용 없음")}</p></div><span class="control-row"><button type="button" class="button button--small" data-edit-manual-status="${escapeHtml(status.id)}">수정</button><button type="button" class="button button--small button--danger" data-remove-manual-status="${escapeHtml(status.id)}">삭제</button></span></div>`,
-          )
+          .map((status) => `<div class="status-list__item"><div><strong>${escapeHtml(status.bodyPart)} ${escapeHtml(status.severity)}</strong><p>${escapeHtml(status.detail || "상세 내용 없음")}</p></div><span class="control-row"><button type="button" class="button button--small" data-edit-manual-status="${escapeHtml(status.id)}">수정</button><button type="button" class="button button--small button--danger" data-remove-manual-status="${escapeHtml(status.id)}">삭제</button></span></div>`)
           .join("")
       : emptyStateMarkup("관리자가 추가한 상태이상이 없습니다.");
 
     const infectionStatusSection =
       character.role === "survivor"
-        ? `<div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>감염 진행 자동 상태이상</strong><span>자동 적용</span></div><div class="status-list"><div class="status-list__item"><strong>${getInfectionStageEffects(
-            character,
-          )
+        ? `<div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>감염 진행 자동 상태이상</strong><span>자동 적용</span></div><div class="status-list"><div class="status-list__item"><strong>${getInfectionStageEffects(character)
             .map((effect) => escapeHtml(effect))
             .join(", ")}</strong></div></div></div>`
         : "";
@@ -7227,11 +7540,9 @@
             ? `<div class="spirit-state-cell"><strong data-infection-clock="${character.id}">${infectionClockText(character)}</strong><small><span data-infection-stage="${character.id}">${freezeStageLabel(freezeStage(effectiveFreezeHours(character)))}</span> · <span data-infection-multiplier="${character.id}">×${clockMultiplier(character).toFixed(1)}</span></small></div>`
             : `<div class="spirit-state-cell infection-complete"><strong>5단계 · 빙혼 완료</strong><small>잔여 시간·배율 미적용</small></div>`;
         const statusLabels = [
-          ...(character.role === "survivor"
-            ? getInfectionStageEffects(character)
-            : []),
-          ...(character.manualStatuses || []).map((status) =>
-            `${status.bodyPart} ${status.severity}`.trim(),
+          ...(character.role === "survivor" ? getInfectionStageEffects(character) : []),
+          ...(character.manualStatuses || []).map(
+            (status) => `${status.bodyPart} ${status.severity}`.trim(),
           ),
         ].filter(Boolean);
         const statusSummary = statusLabels.length
@@ -7331,17 +7642,39 @@
   }
 
   async function putMediaBlobV3(key, file, name = file.name) {
+    if (session?.token && supabaseClient) {
+      const signed = await remoteApi("media-upload-token", {
+        path: key,
+        size: file.size,
+        contentType: file.type || "application/octet-stream",
+      });
+      const { error } = await supabaseClient.storage
+        .from("game-media")
+        .uploadToSignedUrl(
+          signed.path,
+          signed.uploadToken,
+          file,
+          {
+            contentType: file.type || "application/octet-stream",
+          },
+        );
+      if (error) throw error;
+      return;
+    }
+
     const db = await openMediaDbV3();
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(MEDIA_STORE_NAME_V3, "readwrite");
-      transaction.objectStore(MEDIA_STORE_NAME_V3).put({
-        key,
-        blob: file,
-        name,
-        type: file.type || "application/octet-stream",
-        size: file.size,
-        createdAt: new Date().toISOString(),
-      });
+      transaction
+        .objectStore(MEDIA_STORE_NAME_V3)
+        .put({
+          key,
+          blob: file,
+          name,
+          type: file.type || "application/octet-stream",
+          size: file.size,
+          createdAt: new Date().toISOString(),
+        });
       transaction.oncomplete = resolve;
       transaction.onerror = () => reject(transaction.error);
     });
@@ -7364,7 +7697,22 @@
   }
 
   async function mediaObjectUrlV3(key) {
-    if (mediaObjectUrlCacheV3.has(key)) return mediaObjectUrlCacheV3.get(key);
+    const cached = mediaObjectUrlCacheV3.get(key);
+    if (cached) {
+      if (typeof cached === "string") return cached;
+      if (cached.url && cached.expiresAt > Date.now()) return cached.url;
+    }
+
+    if (session?.token) {
+      const result = await remoteApi("media-url", { path: key, download: false });
+      if (!result?.signedUrl) return null;
+      mediaObjectUrlCacheV3.set(key, {
+        url: result.signedUrl,
+        expiresAt: Date.now() + 8 * 60 * 1000,
+      });
+      return result.signedUrl;
+    }
+
     const record = await getMediaRecordV3(key);
     if (!record?.blob) return null;
     const url = URL.createObjectURL(record.blob);
@@ -7686,6 +8034,19 @@
 
   async function downloadStoredMediaV3(key, requestedName) {
     try {
+      if (session?.token) {
+        const result = await remoteApi("media-url", { path: key, download: true });
+        if (!result?.signedUrl) return showToast("원본 파일을 찾지 못했습니다.");
+        const anchor = document.createElement("a");
+        anchor.href = result.signedUrl;
+        anchor.download = requestedName || "download";
+        anchor.rel = "noopener";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return;
+      }
+
       const record = await getMediaRecordV3(key);
       if (!record?.blob) return showToast("원본 파일을 찾지 못했습니다.");
       const url = URL.createObjectURL(record.blob);
@@ -8158,34 +8519,10 @@
       "B2",
       { id: "research_b2_security", label: "보안구역", color: "#e4e1e1" },
       [
-        restrictedRoom(
-          "research_b2_escape",
-          "직원 탈의실",
-          0,
-          0,
-          2,
-          1,
-          "#f4f5f6",
-        ),
+        restrictedRoom("research_b2_escape", "직원 탈의실", 0, 0, 2, 1, "#f4f5f6"),
         restrictedRoom("research_b2_control", "제염실", 3, 0, 4, 1, "#f4f5f6"),
-        restrictedRoom(
-          "research_b2_freeze",
-          "동결매질 조제실",
-          5,
-          0,
-          7,
-          1,
-          "#f4f5f6",
-        ),
-        restrictedRoom(
-          "research_b2_corpse",
-          "영체 모사체 실험실",
-          8,
-          0,
-          9,
-          1,
-          "#f4f5f6",
-        ),
+        restrictedRoom("research_b2_freeze", "동결매질 조제실", 5, 0, 7, 1, "#f4f5f6"),
+        restrictedRoom("research_b2_corpse", "영체 모사체 실험실", 8, 0, 9, 1, "#f4f5f6"),
         room("research_b2_stairs", "보안계단", 10, 0, 10, 1, "#eceff1"),
         room("research_b2_elevator", "전용 승강기", 11, 0, 11, 1, "#eceff1"),
         room("research_b2_security", "보안구역", 0, 2, 11, 4, "#dfdddd"),
@@ -8198,42 +8535,10 @@
           7,
           "#f4f5f6",
         ),
-        restrictedRoom(
-          "research_b2_fraud",
-          "사기 변환 연구실",
-          1,
-          5,
-          3,
-          7,
-          "#f4f5f6",
-        ),
-        restrictedRoom(
-          "research_b2_comms",
-          "저승 측 통신실",
-          4,
-          5,
-          5,
-          7,
-          "#f4f5f6",
-        ),
-        restrictedRoom(
-          "research_b2_server",
-          "기밀자료 서버실",
-          6,
-          5,
-          7,
-          7,
-          "#f4f5f6",
-        ),
-        restrictedRoom(
-          "research_b2_observe",
-          "관찰·통제실",
-          8,
-          5,
-          9,
-          7,
-          "#f4f5f6",
-        ),
+        restrictedRoom("research_b2_fraud", "사기 변환 연구실", 1, 5, 3, 7, "#f4f5f6"),
+        restrictedRoom("research_b2_comms", "저승 측 통신실", 4, 5, 5, 7, "#f4f5f6"),
+        restrictedRoom("research_b2_server", "기밀자료 서버실", 6, 5, 7, 7, "#f4f5f6"),
+        restrictedRoom("research_b2_observe", "관찰·통제실", 8, 5, 9, 7, "#f4f5f6"),
         room(
           "research_b2_emergency_stairs",
           "비상계단",
@@ -8705,14 +9010,13 @@
 
     const movementActor = getMovementActor();
     const currentBuilding =
-      ui.currentBuilding || buildingFromFloorKey(movementActor?.floor || "1F");
+      ui.currentBuilding ||
+      buildingFromFloorKey(movementActor?.floor || "1F");
     const characterBuilding = movementActor
       ? buildingFromFloorKey(movementActor.floor)
       : "";
 
-    const signature = `${currentBuilding}|character:${characterBuilding}|${Object.entries(
-      counts,
-    )
+    const signature = `${currentBuilding}|character:${characterBuilding}|${Object.entries(counts)
       .map(([key, value]) => `${key}:${value}`)
       .join("|")}`;
 
@@ -9059,6 +9363,7 @@
 
     const cards = filteredCharacters
       .map((character) => {
+
         const movementText =
           character.role === "spirit"
             ? `행동력 ${character.ap} / ${character.maxAp}`
@@ -9360,7 +9665,11 @@
 
     elements.modalFooter
       .querySelector("[data-confirm-floor-move]")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
+        if (session?.type === "player" && session?.token) {
+          await performRemoteSpiritMove(character, targetFloor);
+          return;
+        }
         if (character.ap < 1) {
           closeModal();
           showToast("행동력이 부족합니다.");
