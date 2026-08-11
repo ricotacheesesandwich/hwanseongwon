@@ -32,7 +32,7 @@
 
   const ROLE_LABELS = {
     survivor: "생환자",
-    spirit: "빙혼자",
+    spirit: "동결체",
   };
 
   const STATUS_DEFINITIONS = {
@@ -778,8 +778,8 @@
           <div class="status-list">${statuses}</div>
         </section>
         <div class="side-note">
-          <strong>${character.role === "spirit" ? "빙혼자 이동" : "생환자 위치"}</strong>
-          <p>${character.role === "spirit" ? "다른 공간으로 이동할 때 행동력 1이 차감됩니다. 이동 전 소모 행동력을 확인하는 창이 표시됩니다." : "자신의 위치는 직접 바꿀 수 없으며 운영진이 이동시킵니다."} 같은 공간에 있는 생환자와 빙혼자는 그룹 여부와 관계없이 서로 보입니다.</p>
+          <strong>${character.role === "spirit" ? "동결체 이동" : "생환자 위치"}</strong>
+          <p>${character.role === "spirit" ? "다른 공간으로 이동할 때 행동력 1이 차감됩니다. 이동 전 소모 행동력을 확인하는 창이 표시됩니다." : "자신의 위치는 직접 바꿀 수 없으며 운영진이 이동시킵니다."} 같은 공간에 있는 생환자와 동결체는 그룹 여부와 관계없이 서로 보입니다.</p>
         </div>
       </div>
     `;
@@ -897,7 +897,7 @@
               <label class="control-label">분류
                 <select class="form-control" data-role-select>
                   <option value="survivor" ${selected.role === "survivor" ? "selected" : ""}>생환자</option>
-                  <option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>빙혼자</option>
+                  <option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>동결체</option>
                 </select>
               </label>
               ${
@@ -1051,7 +1051,7 @@
         selected.role === "spirit"
           ? `
           <section class="panel-card">
-            <div class="panel-card__header">빙혼자 행동력</div>
+            <div class="panel-card__header">동결체 행동력</div>
             <div class="panel-card__body control-grid">
               <div class="control-row">
                 <button type="button" class="button button--small" data-admin-action="ap-minus">−1</button>
@@ -1091,7 +1091,7 @@
             <label class="control-label">분류
               <select class="form-control" data-role-select>
                 <option value="survivor" ${selected.role === "survivor" ? "selected" : ""}>생환자</option>
-                <option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>빙혼자</option>
+                <option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>동결체</option>
               </select>
             </label>
             <div class="control-row">
@@ -1602,7 +1602,7 @@
       : " · 원격 위치 공유 없음";
     elements.movementRule.textContent =
       actor.role === "spirit"
-        ? `빙혼자 · 공간 변경 1회 = 행동력 1 · 이동 전 확인${sharedText}`
+        ? `동결체 · 공간 변경 1회 = 행동력 1 · 이동 전 확인${sharedText}`
         : `생환자 · 직접 이동 불가 · 운영진 위치 제어${sharedText}`;
   }
 
@@ -1667,7 +1667,7 @@
     const method = transition.type === "stairs" ? "계단" : "엘리베이터";
     openModal({
       eyebrow: "FLOOR MOVEMENT",
-      title: "빙혼자 층 이동 확인",
+      title: "동결체 층 이동 확인",
       body: `
         <div class="movement-confirmation">
           <div class="movement-confirmation__route">
@@ -1869,7 +1869,7 @@
 
   function moveActorTo(actor, targetX, targetY) {
     if (actor.role !== "spirit" && session.type !== "admin") {
-      showToast("직접 이동은 빙혼자만 가능합니다.");
+      showToast("직접 이동은 동결체만 가능합니다.");
       return;
     }
 
@@ -1895,7 +1895,7 @@
     const toRoom = getRoomLabel(actor.floor, targetX, targetY);
     openModal({
       eyebrow: "SPIRIT MOVEMENT",
-      title: "빙혼자 이동 확인",
+      title: "동결체 이동 확인",
       body: `
         <div class="movement-confirmation">
           <div class="movement-confirmation__route">
@@ -1925,6 +1925,7 @@
       showToast("행동력이 변경되어 이동할 수 없습니다.");
       return;
     }
+    settleAllSurvivorFreezeClocks();
     const fromFloor = actor.floor;
     const fromRoom = getRoomLabel(actor.floor, actor.x, actor.y);
     actor.ap -= cost;
@@ -2386,7 +2387,7 @@
 
     if (["ap-minus", "ap-plus-1", "ap-plus-3", "ap-max"].includes(action)) {
       if (character.role !== "spirit") {
-        showToast("행동력은 빙혼자에게만 적용됩니다.");
+        showToast("행동력은 동결체에게만 적용됩니다.");
         return;
       }
       if (action === "ap-minus") character.ap = Math.max(0, character.ap - 1);
@@ -3919,7 +3920,7 @@
     return `
       <div class="operations-summary-grid">
         <article><span>생환자</span><strong>${survivors.length}</strong></article>
-        <article><span>빙혼자</span><strong>${spirits.length}</strong></article>
+        <article><span>동결체</span><strong>${spirits.length}</strong></article>
         <article><span>자료 보관함</span><strong>${state.resourceLibrary.length}</strong></article>
         <article><span>빙혼 이동 기록</span><strong>${state.movementLogs.length}</strong></article>
       </div>
@@ -4058,8 +4059,8 @@
       .join("");
     return `
       <section class="operations-card">
-        <header class="operations-card__filter"><div><p class="eyebrow">SPIRIT MOVEMENT LOG</p><h2>빙혼자 움직임 기록</h2></div><select class="form-control" data-movement-filter><option value="all">전체 빙혼자</option>${filters}</select></header>
-        <div class="operations-table-wrap"><table class="operations-table"><thead><tr><th>시간</th><th>빙혼자</th><th>이전 위치</th><th>도착 위치</th><th>소모 AP</th><th>구분</th></tr></thead><tbody>${rows || `<tr><td colspan="6">이동 기록이 없습니다.</td></tr>`}</tbody></table></div>
+        <header class="operations-card__filter"><div><p class="eyebrow">SPIRIT MOVEMENT LOG</p><h2>동결체 움직임 기록</h2></div><select class="form-control" data-movement-filter><option value="all">전체 동결체</option>${filters}</select></header>
+        <div class="operations-table-wrap"><table class="operations-table"><thead><tr><th>시간</th><th>동결체</th><th>이전 위치</th><th>도착 위치</th><th>소모 AP</th><th>구분</th></tr></thead><tbody>${rows || `<tr><td colspan="6">이동 기록이 없습니다.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 
@@ -4340,7 +4341,7 @@
             state.exposure[role][group][key] = input.checked;
           });
       });
-      addLog("운영진이 생환자·빙혼자 노출 환경설정을 저장했습니다.");
+      addLog("운영진이 생환자·동결체 노출 환경설정을 저장했습니다.");
       persistState();
       renderAdminOperationsPage();
       showToast("환경설정을 저장하고 적용했습니다.");
@@ -4825,7 +4826,7 @@
           `<article class="event-manager-card"><header><div><h3>${escapeHtml(item.title)}</h3><div class="event-manager-card__meta"><span>${eventAudienceLabel(item.audience)}</span><span>${formatDateTime(item.createdAt)}</span><strong>${item.active ? "노출 중" : "비활성"}</strong></div></div></header><p>${escapeHtml(item.message)}</p><div class="event-manager-card__actions"><button type="button" class="button button--small ${item.active ? "button--soft" : "button--primary"}" data-toggle-event="${item.id}">${item.active ? "노출 중지" : "다시 노출"}</button><button type="button" class="button button--small button--danger" data-delete-event="${item.id}">삭제</button></div></article>`,
       )
       .join("");
-    return `<div class="event-admin-grid"><section class="operations-card"><header><div><p class="eyebrow">EMERGENCY EVENT</p><h2>긴급 이벤트 추가</h2></div></header><form class="operations-form" data-emergency-event-form><label>이벤트 제목<input class="form-control" name="title" required maxlength="80" /></label><label>안내 내용<textarea class="form-control" name="message" required rows="7"></textarea></label><label>노출 대상<select class="form-control" name="audience"><option value="all">전체</option><option value="survivor">생환자</option><option value="spirit">빙혼자</option><option value="admin">운영진</option></select></label><button type="submit" class="button button--danger">긴급 이벤트 등록</button></form></section><section class="operations-card"><header><div><p class="eyebrow">EVENT CONTROL</p><h2>이벤트 조정</h2></div><span>${state.emergencyEvents.filter((item) => item.active).length}건 노출</span></header><div class="event-manager-list">${events || emptyStateMarkup("등록된 긴급 이벤트가 없습니다.")}</div></section></div>`;
+    return `<div class="event-admin-grid"><section class="operations-card"><header><div><p class="eyebrow">EMERGENCY EVENT</p><h2>긴급 이벤트 추가</h2></div></header><form class="operations-form" data-emergency-event-form><label>이벤트 제목<input class="form-control" name="title" required maxlength="80" /></label><label>안내 내용<textarea class="form-control" name="message" required rows="7"></textarea></label><label>노출 대상<select class="form-control" name="audience"><option value="all">전체</option><option value="survivor">생환자</option><option value="spirit">동결체</option><option value="admin">운영진</option></select></label><button type="submit" class="button button--danger">긴급 이벤트 등록</button></form></section><section class="operations-card"><header><div><p class="eyebrow">EVENT CONTROL</p><h2>이벤트 조정</h2></div><span>${state.emergencyEvents.filter((item) => item.active).length}건 노출</span></header><div class="event-manager-list">${events || emptyStateMarkup("등록된 긴급 이벤트가 없습니다.")}</div></section></div>`;
   }
 
   function eventAudienceLabel(audience) {
@@ -4833,7 +4834,7 @@
       {
         all: "전체 공개",
         survivor: "생환자",
-        spirit: "빙혼자",
+        spirit: "동결체",
         admin: "운영진",
       }[audience] || "전체 공개"
     );
@@ -5242,7 +5243,7 @@
     const list = state.characters.filter(
       (c) => filter === "all" || c.role === filter,
     );
-    return `<div class="operations-summary-grid"><article><span>전체</span><strong>${state.characters.length}</strong></article><article><span>생환자</span><strong>${state.characters.filter((c) => c.role === "survivor").length}</strong></article><article><span>빙혼자</span><strong>${state.characters.filter((c) => c.role === "spirit").length}</strong></article><article><span>자료 보관함</span><strong>${state.resourceLibrary.length}</strong></article></div><div class="roster-filter"><button type="button" data-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div>${combinedRosterMarkup(list)}`;
+    return `<div class="operations-summary-grid"><article><span>전체</span><strong>${state.characters.length}</strong></article><article><span>생환자</span><strong>${state.characters.filter((c) => c.role === "survivor").length}</strong></article><article><span>동결체</span><strong>${state.characters.filter((c) => c.role === "spirit").length}</strong></article><article><span>자료 보관함</span><strong>${state.resourceLibrary.length}</strong></article></div><div class="roster-filter"><button type="button" data-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">동결체</button><button type="button" data-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div>${combinedRosterMarkup(list)}`;
   }
   function combinedRosterMarkup(characters) {
     const rows = characters
@@ -5292,7 +5293,7 @@
         return `<article class="freeze-card"><div class="freeze-card__head"><div><h3>${c.id} · ${escapeHtml(c.name)}</h3><small>${escapeHtml(c.floor)} · ${escapeHtml(getRoomLabel(c.floor, c.x, c.y))}</small></div>${roleChipMarkup("spirit")}</div><div class="freeze-card__metrics"><div><span>누적 진행 시간</span><strong>${hours.toFixed(2)}시간</strong></div><div><span>현재 단계</span><strong>${freezeStageLabel(stage)}</strong></div><div><span>현재 시간 배율</span><strong>${clockMultiplier(c).toFixed(1)}배</strong></div></div><div class="freeze-progress"><i style="width:${pct}%"></i></div><p class="space-multiplier-note">다음 전환: ${stage >= 5 ? "최종 단계 도달" : `${next}시간 · ${Math.max(0, next - hours).toFixed(1)}시간 남음`}<br>현재 공간 진행도 ${getSpaceBurningLevel(c.floor, getRoomId(c.floor, c.x, c.y))}단계 → +${currentSpaceAddition(c).toFixed(1)}배속</p><div class="freeze-modifiers">${mods || `<span class="muted-text">추가 노출 배율 없음</span>`}</div><form class="freeze-form" data-time-modifier-form><input type="hidden" name="characterId" value="${c.id}"><label>노출 선택<select class="form-control" name="preset">${options}</select></label><label>기타 배율<input class="form-control" name="customValue" type="number" step="0.1" min="0" placeholder="+0.4"></label><button class="button button--primary" type="submit">배속 추가</button><label class="custom-label">기타 설명<input class="form-control" name="customLabel" maxlength="60" placeholder="기타 선택 시 노출 내용을 입력"></label></form></article>`;
       })
       .join("");
-    return `<section class="operations-card"><header><div><p class="eyebrow">FREEZING TIMELINE</p><h2>실제 단계 전환 기준</h2></div></header><table class="freeze-stage-table"><thead><tr><th>단계</th><th>전환 시점</th></tr></thead><tbody><tr><td>1단계</td><td>18시간</td></tr><tr><td>2단계</td><td>42시간</td></tr><tr><td>3단계</td><td>66시간</td></tr><tr><td>4단계</td><td>90시간</td></tr><tr><td>5단계</td><td>120시간</td></tr></tbody></table></section><div class="freeze-grid">${cards || emptyStateMarkup("빙혼자가 없습니다.")}</div>`;
+    return `<section class="operations-card"><header><div><p class="eyebrow">FREEZING TIMELINE</p><h2>실제 단계 전환 기준</h2></div></header><table class="freeze-stage-table"><thead><tr><th>단계</th><th>전환 시점</th></tr></thead><tbody><tr><td>1단계</td><td>18시간</td></tr><tr><td>2단계</td><td>42시간</td></tr><tr><td>3단계</td><td>66시간</td></tr><tr><td>4단계</td><td>90시간</td></tr><tr><td>5단계</td><td>120시간</td></tr></tbody></table></section><div class="freeze-grid">${cards || emptyStateMarkup("동결체가 없습니다.")}</div>`;
   }
 
   function burningOperationsMarkup() {
@@ -5305,7 +5306,7 @@
         .join("");
       return `<section class="operations-card"><header><div><p class="eyebrow">${floor} PRIVATE PROGRESS</p><h2>${floor} 공간 진행도</h2></div><span>운영진만 열람</span></header><div class="burning-room-list">${rows}</div></section>`;
     }).join("");
-    return `<form data-burning-settings-form><section class="operations-card settings-guide"><h3>공간 진행도 시간 적용</h3><p>1단계 +0.2 · 2단계 +0.5 · 3단계 +1.2 · 4단계 +2.0 · 5단계 +2.5배속. 생환자와 빙혼자 화면에는 단계 및 배율이 노출되지 않습니다.</p></section><div class="burning-admin-grid">${groups}</div><div class="settings-save-bar"><button type="submit" class="button button--primary">공간 진행도 저장</button></div></form>`;
+    return `<form data-burning-settings-form><section class="operations-card settings-guide"><h3>공간 진행도 시간 적용</h3><p>1단계 +0.2 · 2단계 +0.5 · 3단계 +1.2 · 4단계 +2.0 · 5단계 +2.5배속. 생환자와 동결체 화면에는 단계 및 배율이 노출되지 않습니다.</p></section><div class="burning-admin-grid">${groups}</div><div class="settings-save-bar"><button type="submit" class="button button--primary">공간 진행도 저장</button></div></form>`;
   }
 
   function settingsOperationsMarkup() {
@@ -5336,7 +5337,7 @@
           `<article class="event-manager-card ${item.active ? "" : "is-paused"}"><header><div><h3>${escapeHtml(item.title)}</h3><div class="event-manager-card__meta"><span>${eventAudienceLabel(item.audience)}</span><span>${formatDateTime(item.createdAt)}</span><strong>${item.active ? "노출 중" : "노출 중지"}</strong></div></div></header><p>${escapeHtml(item.message)}</p><div class="event-manager-card__actions"><button type="button" class="button button--small ${item.active ? "button--soft" : "button--primary"}" data-toggle-event="${item.id}">${item.active ? "노출 중지" : "노출 중"}</button><button type="button" class="button button--small button--danger" data-delete-event="${item.id}">삭제</button></div></article>`,
       )
       .join("");
-    return `<div class="event-admin-grid"><section class="operations-card"><header><div><p class="eyebrow">EMERGENCY EVENT</p><h2>긴급 이벤트 추가</h2></div></header><form class="operations-form" data-emergency-event-form><label>이벤트 제목<input class="form-control" name="title" required maxlength="80"></label><label>안내 내용<textarea class="form-control" name="message" required rows="7"></textarea></label><label>노출 대상<select class="form-control" name="audience"><option value="all">전체</option><option value="survivor">생환자</option><option value="spirit">빙혼자</option><option value="admin">운영진</option></select></label><button type="submit" class="button button--danger">긴급 이벤트 등록</button></form></section><section class="operations-card"><header><div><p class="eyebrow">EVENT CONTROL</p><h2>이벤트 조정</h2></div><span>${state.emergencyEvents.filter((i) => i.active).length}건 노출</span></header><div class="event-manager-list">${events || emptyStateMarkup("등록된 긴급 이벤트가 없습니다.")}</div></section></div>`;
+    return `<div class="event-admin-grid"><section class="operations-card"><header><div><p class="eyebrow">EMERGENCY EVENT</p><h2>긴급 이벤트 추가</h2></div></header><form class="operations-form" data-emergency-event-form><label>이벤트 제목<input class="form-control" name="title" required maxlength="80"></label><label>안내 내용<textarea class="form-control" name="message" required rows="7"></textarea></label><label>노출 대상<select class="form-control" name="audience"><option value="all">전체</option><option value="survivor">생환자</option><option value="spirit">동결체</option><option value="admin">운영진</option></select></label><button type="submit" class="button button--danger">긴급 이벤트 등록</button></form></section><section class="operations-card"><header><div><p class="eyebrow">EVENT CONTROL</p><h2>이벤트 조정</h2></div><span>${state.emergencyEvents.filter((i) => i.active).length}건 노출</span></header><div class="event-manager-list">${events || emptyStateMarkup("등록된 긴급 이벤트가 없습니다.")}</div></section></div>`;
   }
 
   function renderPlayerJournal() {
@@ -6004,7 +6005,7 @@
       character.spiritSince = convertedAt;
       convertedCharacters.push(character);
       addLog(
-        `${character.name}의 감염 잔여 시간이 종료되어 자동으로 빙혼자로 전환되었습니다.`,
+        `${character.name}의 감염 잔여 시간이 종료되어 자동으로 동결체로 전환되었습니다.`,
       );
     });
 
@@ -6019,10 +6020,10 @@
         (character) => character.id === session.characterId,
       );
     if (currentPlayerConverted) {
-      showToast("감염 시간이 모두 소진되어 빙혼자로 전환되었습니다.");
+      showToast("감염 시간이 모두 소진되어 동결체로 전환되었습니다.");
     } else if (session?.type === "admin") {
       showToast(
-        `${convertedCharacters.map((character) => character.name).join(", ")}이(가) 빙혼자로 자동 전환되었습니다.`,
+        `${convertedCharacters.map((character) => character.name).join(", ")}이(가) 동결체로 자동 전환되었습니다.`,
       );
     }
     return true;
@@ -6101,7 +6102,7 @@
       : `<div class="compact-empty">편성된 팀이 없습니다.</div>`;
 
     elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body">
-      <div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div>
+      <div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">동결체</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div>
       <div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div>
       <section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section>
       
@@ -6157,7 +6158,7 @@
       <div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}
       <section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section>
       <section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list">${statuses}</div></section>
-      <div class="side-note"><strong>${character.role === "spirit" ? "빙혼자 이동" : "생환자 위치"}</strong><p>${character.role === "spirit" ? "다른 공간으로 이동할 때 행동력 1이 차감됩니다. 이동 전 소모 행동력을 확인하는 창이 표시됩니다." : "자신의 위치는 직접 바꿀 수 없으며 운영진이 이동시킵니다."} 빙혼자는 같은 공간의 생환자 신원 대신 온기와 인원수만 감지합니다.</p></div>
+      <div class="side-note"><strong>${character.role === "spirit" ? "동결체 이동" : "생환자 위치"}</strong><p>${character.role === "spirit" ? "다른 공간으로 이동할 때 행동력 1이 차감됩니다. 이동 전 소모 행동력을 확인하는 창이 표시됩니다." : "자신의 위치는 직접 바꿀 수 없으며 운영진이 이동시킵니다."} 동결체는 같은 공간의 생환자 신원 대신 온기와 인원수만 감지합니다.</p></div>
     </div>`;
   }
 
@@ -6213,7 +6214,7 @@
       <div class="admin-modal-grid">${apControls}
         <div class="modal-control-card"><div class="modal-control-card__title"><strong>감염 진행 시간</strong><span data-infection-stage="${selected.id}">${freezeStageLabel(freezeStage(effectiveFreezeHours(selected)))}</span></div><div class="infection-summary-card__time" data-infection-clock="${selected.id}">${infectionClockText(selected)}</div><div class="infection-summary-card__meta"><span>현재 배속</span><strong data-infection-multiplier="${selected.id}">×${clockMultiplier(selected).toFixed(1)}</strong></div><button type="button" class="button button--danger button--small" data-reset-infection-clock="${selected.id}">120:00:00으로 초기화</button></div>
         <div class="modal-control-card"><div class="modal-control-card__title"><strong>개별 위치 이동</strong><span>선택 캐릭터만</span></div><p>버튼을 누른 뒤 지도에서 이동시킬 위치를 선택합니다.</p><div class="control-row"><button type="button" class="button ${ui.adminTool === "forceMove" ? "button--primary" : ""}" data-admin-action="toggle-force-move">선택 캐릭터 이동</button></div></div>
-        <div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>역할 및 상태</strong><span>토큰에 즉시 반영</span></div><div class="modal-form-grid"><label class="control-label">분류<select class="form-control" data-role-select><option value="survivor" ${selected.role === "survivor" ? "selected" : ""}>생환자</option><option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>빙혼자</option></select></label>${selected.role === "spirit" ? `<label class="control-label">빙혼 상태<select class="form-control" data-spirit-state-select><option value="stable" ${selected.spiritState === "stable" ? "selected" : ""}>안정</option><option value="unstable" ${selected.spiritState === "unstable" ? "selected" : ""}>불안정</option><option value="freezing" ${selected.spiritState === "freezing" ? "selected" : ""}>동결 진행</option><option value="dormant" ${selected.spiritState === "dormant" ? "selected" : ""}>휴면</option></select><small>현재 상태 시작: ${formatDateTime(selected.spiritSince)} · ${formatElapsed(selected.spiritSince)}</small></label>` : ""}<label class="control-label">상태이상 추가<span class="control-row"><select class="form-control" data-status-select><option value="">상태 선택</option>${statusOptions}</select><button type="button" class="button" data-admin-action="apply-status">적용</button></span></label></div><div class="status-list">${statusList}</div></div>
+        <div class="modal-control-card modal-control-card--wide"><div class="modal-control-card__title"><strong>역할 및 상태</strong><span>토큰에 즉시 반영</span></div><div class="modal-form-grid"><label class="control-label">분류<select class="form-control" data-role-select><option value="survivor" ${selected.role === "survivor" ? "selected" : ""}>생환자</option><option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>동결체</option></select></label>${selected.role === "spirit" ? `<label class="control-label">빙혼 상태<select class="form-control" data-spirit-state-select><option value="stable" ${selected.spiritState === "stable" ? "selected" : ""}>안정</option><option value="unstable" ${selected.spiritState === "unstable" ? "selected" : ""}>불안정</option><option value="freezing" ${selected.spiritState === "freezing" ? "selected" : ""}>동결 진행</option><option value="dormant" ${selected.spiritState === "dormant" ? "selected" : ""}>휴면</option></select><small>현재 상태 시작: ${formatDateTime(selected.spiritSince)} · ${formatElapsed(selected.spiritSince)}</small></label>` : ""}<label class="control-label">상태이상 추가<span class="control-row"><select class="form-control" data-status-select><option value="">상태 선택</option>${statusOptions}</select><button type="button" class="button" data-admin-action="apply-status">적용</button></span></label></div><div class="status-list">${statusList}</div></div>
       </div>`,
       footer: `<button type="button" class="button" data-modal-close>닫기</button>`,
     });
@@ -6323,6 +6324,7 @@
   }
 
   function moveCharacterSetTo(memberIds, floor, x, y) {
+    settleAllSurvivorFreezeClocks();
     const targetRoomId = getRoomId(floor, x, y);
     const roomCells = [];
     for (let row = 0; row < GRID_ROWS; row += 1)
@@ -6489,6 +6491,43 @@
     return next;
   }
 
+  const COLD_CONTACT_MULTIPLIER_ADD = 0.2;
+
+  function getColdContactInfo(
+    character,
+    floorOverride = null,
+    roomOverride = null,
+  ) {
+    if (!character || character.role !== "survivor") {
+      return { active: false, count: 0, roomId: null };
+    }
+    const floor = floorOverride || character.floor;
+    const roomId = roomOverride || getRoomId(floor, character.x, character.y);
+    if (!roomId) return { active: false, count: 0, roomId: null };
+
+    const spirits = state.characters.filter(
+      (candidate) =>
+        candidate.role === "spirit" &&
+        candidate.floor === floor &&
+        getRoomId(candidate.floor, candidate.x, candidate.y) === roomId,
+    );
+    return {
+      active: spirits.length > 0,
+      count: spirits.length,
+      roomId,
+    };
+  }
+
+  function coldContactAddition(
+    character,
+    floorOverride = null,
+    roomOverride = null,
+  ) {
+    return getColdContactInfo(character, floorOverride, roomOverride).active
+      ? COLD_CONTACT_MULTIPLIER_ADD
+      : 0;
+  }
+
   function clockMultiplier(
     character,
     floorOverride = null,
@@ -6497,7 +6536,9 @@
     if (!character || character.role === "spirit") return 1;
     const clock = character.freezeClock || { modifiers: [] };
     let multiplier =
-      1 + currentSpaceAddition(character, floorOverride, roomOverride);
+      1 +
+      currentSpaceAddition(character, floorOverride, roomOverride) +
+      coldContactAddition(character, floorOverride, roomOverride);
     let minimum = 1;
     for (const modifier of clock.modifiers || []) {
       multiplier += Number(modifier.add || 0);
@@ -6527,6 +6568,12 @@
         realHours * clockMultiplier(character, floorOverride, roomOverride),
     );
     character.freezeClock.lastUpdated = new Date(now).toISOString();
+  }
+
+  function settleAllSurvivorFreezeClocks() {
+    state.characters
+      .filter((character) => character.role === "survivor")
+      .forEach((character) => settleFreezeClock(character));
   }
 
   function effectiveFreezeHours(character) {
@@ -6582,6 +6629,7 @@
   }
 
   function convertExpiredSurvivorsToSpirits() {
+    settleAllSurvivorFreezeClocks();
     const convertedCharacters = [];
     const convertedAt = new Date().toISOString();
     state.characters.forEach((character) => {
@@ -6606,7 +6654,7 @@
       character.spiritSince = convertedAt;
       convertedCharacters.push(character);
       addLog(
-        `${character.name}의 감염 잔여 시간이 종료되어 자동으로 빙혼자로 전환되었습니다.`,
+        `${character.name}의 감염 잔여 시간이 종료되어 자동으로 동결체로 전환되었습니다.`,
       );
     });
     if (!convertedCharacters.length) return false;
@@ -6618,10 +6666,10 @@
         (character) => character.id === session.characterId,
       )
     ) {
-      showToast("감염 시간이 모두 소진되어 빙혼자로 전환되었습니다.");
+      showToast("감염 시간이 모두 소진되어 동결체로 전환되었습니다.");
     } else if (session?.type === "admin") {
       showToast(
-        `${convertedCharacters.map((character) => character.name).join(", ")}이(가) 빙혼자로 자동 전환되었습니다.`,
+        `${convertedCharacters.map((character) => character.name).join(", ")}이(가) 동결체로 자동 전환되었습니다.`,
       );
     }
     return true;
@@ -6702,7 +6750,15 @@
         : survivorTokenColorV3(character, team);
     const tokenDark = character.role === "spirit" ? "#58121f" : "#0b2238";
     const teamTitle = team ? ` · ${escapeHtml(team.name)}` : "";
-    return `<span class="character-token character-token--${character.role} ${team && character.role === "survivor" ? "is-team-colored" : ""} ${selected ? "is-selected" : ""}" data-token-character="${character.id}" style="--token-color:${tokenColor};--token-dark:${tokenDark}" title="${escapeHtml(character.name)} · ${character.id} · ${ROLE_LABELS[character.role]}${teamTitle}"><span class="character-token__name">${escapeHtml(character.name)}</span>${status ? `<i class="character-token__status">${status.icon}</i>` : ""}</span>`;
+    const coldContact = getColdContactInfo(character);
+    const canShowColdMarker =
+      session?.type === "admin" ||
+      (session?.type === "player" && session.characterId === character.id);
+    const coldMarkup =
+      character.role === "survivor" && coldContact.active && canShowColdMarker
+        ? `<i class="character-token__cold-mark" title="한기" aria-label="한기">氷</i>`
+        : "";
+    return `<span class="character-token character-token--${character.role} ${team && character.role === "survivor" ? "is-team-colored" : ""} ${selected ? "is-selected" : ""} ${coldContact.active ? "has-cold-contact" : ""}" data-token-character="${character.id}" style="--token-color:${tokenColor};--token-dark:${tokenDark}" title="${escapeHtml(character.name)} · ${character.id} · ${ROLE_LABELS[character.role]}${teamTitle}"><span class="character-token__name">${escapeHtml(character.name)}</span>${status ? `<i class="character-token__status">${status.icon}</i>` : ""}${coldMarkup}</span>`;
   }
 
   function renderMap() {
@@ -6952,7 +7008,7 @@
           .join("")
       : `<div class="compact-empty">편성된 팀이 없습니다.</div>`;
 
-    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body"><div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div><div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div><section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section></div>`;
+    elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>캐릭터 현황</h2><span class="status-pill">${filteredCharacters.length} / ${state.characters.length}명</span></div><div class="sidebar-body"><div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터"><button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button><button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">동결체</button><button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button></div><div class="roster-list">${cards || emptyStateMarkup("해당 분류의 캐릭터가 없습니다.")}</div><section class="left-team-section"><div class="left-team-section__head"><div><p class="eyebrow">TEAM CONTROL</p><h3>팀 편성 · 위치 공유</h3></div><button type="button" class="button button--small button--primary" data-open-team-manager>편성·수정</button></div><div class="compact-team-list">${teamCards}</div></section></div>`;
   }
 
   const INFECTION_STAGE_EFFECTS = [
@@ -7065,7 +7121,7 @@
       : `<span class="shared-member-chip is-muted">공개 중인 같은 분류 팀원 없음</span>`;
     const spiritGuide =
       character.role === "spirit"
-        ? `<div class="side-note"><strong>빙혼자 이동</strong><p>다른 공간으로 이동할 때 행동력 1이 차감됩니다. 같은 공간의 생환자는 신원 대신 온기와 인원수로만 감지합니다.</p></div>`
+        ? `<div class="side-note"><strong>동결체 이동</strong><p>다른 공간으로 이동할 때 행동력 1이 차감됩니다. 같은 공간의 생환자는 신원 대신 온기와 인원수로만 감지합니다.</p></div>`
         : "";
     elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div><h2>${escapeHtml(character.name)}</h2><span class="character-card__id">ID ${character.id}</span></div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list" data-character-status-effects="${character.id}">${statuses}</div></section>${spiritGuide}</div>`;
   }
@@ -7182,7 +7238,7 @@
           `<div class="infection-complete-row">${avatarMarkup(character, true)}<span><strong>${character.id} · ${escapeHtml(character.name)}</strong><small>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</small></span><em>5단계 · 빙혼 완료</em></div>`,
       )
       .join("");
-    return `<section class="operations-card"><header><div><p class="eyebrow">INFECTION TIMELINE</p><h2>생환자 감염 진행 관리</h2></div><button type="button" class="button button--danger button--small" data-reset-all-infection-clocks>생환자 전체 120:00:00 초기화</button></header><p class="form-help">생환자만 잔여 시간과 배율을 계산합니다. 배속 추가에는 적용 사유가 반드시 필요하며, 별도의 시간 추가·차감은 적용 버튼을 눌러 반영합니다.</p><table class="freeze-stage-table"><thead><tr><th>단계</th><th>감염 경과 기준</th></tr></thead><tbody><tr><td>1단계</td><td>18시간</td></tr><tr><td>2단계</td><td>42시간</td></tr><tr><td>3단계</td><td>66시간</td></tr><tr><td>4단계</td><td>90시간</td></tr><tr><td>5단계</td><td>120시간</td></tr></tbody></table></section><div class="freeze-grid">${cards || emptyStateMarkup("감염 시간을 관리할 생환자가 없습니다.")}</div><section class="operations-card"><header><div><p class="eyebrow">COMPLETED INFECTION</p><h2>빙혼 완료 인원</h2></div><span>${spirits.length}명</span></header><div class="infection-complete-list">${spiritRows || emptyStateMarkup("빙혼자가 없습니다.")}</div></section>`;
+    return `<section class="operations-card"><header><div><p class="eyebrow">INFECTION TIMELINE</p><h2>생환자 감염 진행 관리</h2></div><button type="button" class="button button--danger button--small" data-reset-all-infection-clocks>생환자 전체 120:00:00 초기화</button></header><p class="form-help">생환자만 잔여 시간과 배율을 계산합니다. 배속 추가에는 적용 사유가 반드시 필요하며, 별도의 시간 추가·차감은 적용 버튼을 눌러 반영합니다.</p><table class="freeze-stage-table"><thead><tr><th>단계</th><th>감염 경과 기준</th></tr></thead><tbody><tr><td>1단계</td><td>18시간</td></tr><tr><td>2단계</td><td>42시간</td></tr><tr><td>3단계</td><td>66시간</td></tr><tr><td>4단계</td><td>90시간</td></tr><tr><td>5단계</td><td>120시간</td></tr></tbody></table></section><div class="freeze-grid">${cards || emptyStateMarkup("감염 시간을 관리할 생환자가 없습니다.")}</div><section class="operations-card"><header><div><p class="eyebrow">COMPLETED INFECTION</p><h2>빙혼 완료 인원</h2></div><span>${spirits.length}명</span></header><div class="infection-complete-list">${spiritRows || emptyStateMarkup("동결체가 없습니다.")}</div></section>`;
   }
 
   function inventoryOperationsMarkup() {
@@ -8952,7 +9008,7 @@
       <div class="sidebar-body">
         <div class="sidebar-roster-filter" aria-label="캐릭터 현황 필터">
           <button type="button" data-sidebar-roster-filter="all" class="${filter === "all" ? "is-active" : ""}">전체</button>
-          <button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">빙혼자</button>
+          <button type="button" data-sidebar-roster-filter="spirit" class="${filter === "spirit" ? "is-active" : ""}">동결체</button>
           <button type="button" data-sidebar-roster-filter="survivor" class="${filter === "survivor" ? "is-active" : ""}">생환자</button>
         </div>
         <div class="roster-list">
@@ -9159,7 +9215,7 @@
 
     openModal({
       eyebrow: "공간 이동",
-      title: "빙혼자 이동 확인",
+      title: "동결체 이동 확인",
       body: `<div class="movement-confirmation">
         <div class="movement-confirmation__route">
           <span>${escapeHtml(buildingLabelFromFloor(character.floor))} ${escapeHtml(floorLabelFromKey(character.floor))}</span>
@@ -9180,6 +9236,7 @@
           showToast("행동력이 부족합니다.");
           return;
         }
+        settleAllSurvivorFreezeClocks();
         const fromFloor = character.floor;
         const fromRoom = getRoomLabel(
           character.floor,
@@ -9209,6 +9266,15 @@
         closeModal();
         renderAll();
       });
+  }
+
+  function requestSpiritMove(character, floorId, x, y) {
+    if (!character || character.role !== "spirit") return;
+    if (character.floor !== floorId) {
+      showToast("현재 층에서만 직접 이동할 수 있습니다.");
+      return;
+    }
+    moveActorTo(character, x, y);
   }
 
   function handleMapClick(event) {
@@ -9241,6 +9307,7 @@
     const actor = getMovementActor();
 
     if (session.type === "admin" && ui.adminTool === "forceMove") {
+      settleAllSurvivorFreezeClocks();
       const previous = {
         floor: actor.floor,
         room: getRoomLabel(actor.floor, actor.x, actor.y),
