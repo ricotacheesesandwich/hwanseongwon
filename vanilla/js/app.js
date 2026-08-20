@@ -147,6 +147,40 @@
     spirit: "동결체",
   };
 
+  const STATUS_DEFINITIONS = {
+    hypothermia: {
+      name: "저체온",
+      icon: "❄",
+      description: "차가운 환경에 장시간 노출된 상태입니다.",
+    },
+    frostbite: {
+      name: "동상",
+      icon: "✣",
+      description: "이동과 조사에 주의가 필요한 상태입니다.",
+    },
+    injured: { name: "부상", icon: "＋", description: "외상을 입었습니다." },
+    unstable: {
+      name: "불안정",
+      icon: "⌁",
+      description: "동결 상태가 불안정합니다.",
+    },
+    immobilized: {
+      name: "행동불능",
+      icon: "⊘",
+      description: "관리자가 해제할 때까지 이동할 수 없습니다.",
+    },
+    vision_limited: {
+      name: "시야 제한",
+      icon: "◌",
+      description: "생존자라도 본인 중심 3×3만 볼 수 있습니다.",
+    },
+    tracked: {
+      name: "추적당함",
+      icon: "◎",
+      description: "동결체가 흔적을 따라오고 있습니다.",
+    },
+  };
+
   const AVATAR_COLORS = {
     101: ["#243e5a", "#102438"],
     102: ["#9aa8b8", "#586779"],
@@ -692,6 +726,9 @@
     ui.rightPanelTab = "manage";
     ui.operationsOpen = false;
     openApp();
+    syncRemoteMapRules().catch((error) =>
+      console.error("서버 지도 규칙 동기화 실패", error),
+    );
   }
 
   function logout() {
@@ -911,6 +948,12 @@
 
   function renderAdminPanel() {
     const selected = getCharacter(ui.selectedCharacterId);
+    const statusOptions = Object.entries(STATUS_DEFINITIONS)
+      .map(
+        ([id, status]) =>
+          `<option value="${id}">${escapeHtml(status.name)}</option>`,
+      )
+      .join("");
 
     const tabs = [
       ["manage", "운영"],
@@ -932,7 +975,7 @@
       </div>
       <div class="sidebar-body">
         <div class="panel-tabs">${tabs}</div>
-        <div class="panel-content">${adminPanelContent(ui.rightPanelTab, selected)}</div>
+        <div class="panel-content">${adminPanelContent(ui.rightPanelTab, selected, statusOptions)}</div>
       </div>
     `;
   }
@@ -1005,6 +1048,12 @@
   function showAdminHubModal(tab = "map") {
     ui.adminModalTab = tab;
     const selected = getCharacter(ui.selectedCharacterId);
+    const statusOptions = Object.entries(STATUS_DEFINITIONS)
+      .map(
+        ([id, status]) =>
+          `<option value="${id}">${escapeHtml(status.name)}</option>`,
+      )
+      .join("");
     const tabLabels = { map: "지도", records: "운영 기록", board: "단서 연결" };
     let content = "";
 
@@ -1030,9 +1079,9 @@
           </section>
         </div>`;
     } else if (tab === "records") {
-      content = adminPanelContent("records", selected);
+      content = adminPanelContent("records", selected, statusOptions);
     } else {
-      content = adminPanelContent("board", selected);
+      content = adminPanelContent("board", selected, statusOptions);
     }
 
     openModal({
@@ -1053,8 +1102,16 @@
     });
   }
 
-  function adminPanelContent(tab, selected) {
+  function adminPanelContent(tab, selected, statusOptions) {
     if (tab === "manage") {
+      const statusList = selected.statuses.length
+        ? selected.statuses
+            .map((statusId) => {
+              const status = STATUS_DEFINITIONS[statusId];
+              return `<div class="status-list__item"><strong>${status.icon} ${escapeHtml(status.name)}</strong><button type="button" class="button button--small" data-remove-status="${statusId}">해제</button></div>`;
+            })
+            .join("")
+        : emptyStateMarkup("상태이상 없음");
       const team = getTeamForCharacter(selected.id);
       const apPanel =
         selected.role === "spirit"
@@ -1095,7 +1152,7 @@
         ${apPanel}
 
         <section class="panel-card">
-          <div class="panel-card__header">역할</div>
+          <div class="panel-card__header">역할 및 상태</div>
           <div class="panel-card__body form-stack">
             <label class="control-label">분류
               <select class="form-control" data-role-select>
@@ -1103,6 +1160,11 @@
                 <option value="spirit" ${selected.role === "spirit" ? "selected" : ""}>동결체</option>
               </select>
             </label>
+            <div class="control-row">
+              <select class="form-control" data-status-select><option value="">상태 선택</option>${statusOptions}</select>
+              <button type="button" class="button" data-admin-action="apply-status">적용</button>
+            </div>
+            <div class="status-list">${statusList}</div>
           </div>
         </section>
 
@@ -1487,6 +1549,11 @@
       return;
     }
 
+    if (actor.statuses.includes("immobilized")) {
+      showToast("행동불능 상태라 이동할 수 없습니다.");
+      return;
+    }
+
     const reachable = getReachableCellCosts(actor, actor.floor);
     const targetKey = cellKey(targetX, targetY);
     if (!reachable.has(targetKey)) {
@@ -1803,6 +1870,21 @@
       return;
     }
 
+    const removeStatusButton = event.target.closest("[data-remove-status]");
+    if (removeStatusButton) {
+      const character = getCharacter(ui.selectedCharacterId);
+      character.statuses = character.statuses.filter(
+        (id) => id !== removeStatusButton.dataset.removeStatus,
+      );
+      addLog(
+        `관리자가 ${character.name}의 ${STATUS_DEFINITIONS[removeStatusButton.dataset.removeStatus].name} 상태를 해제했습니다.`,
+      );
+      persistState();
+      renderAll();
+      showCharacterManagementModal(character.id);
+      return;
+    }
+
     const layerButton = event.target.closest("[data-layer]");
     if (layerButton) {
       const layer = layerButton.dataset.layer;
@@ -1839,6 +1921,20 @@
     const dissolveButton = event.target.closest("[data-dissolve-team]");
     if (dissolveButton && session.type === "admin") {
       dissolveTeam(dissolveButton.dataset.dissolveTeam);
+      return;
+    }
+
+    const removeStatusButton = event.target.closest("[data-remove-status]");
+    if (removeStatusButton && session.type === "admin") {
+      const character = getCharacter(ui.selectedCharacterId);
+      character.statuses = character.statuses.filter(
+        (id) => id !== removeStatusButton.dataset.removeStatus,
+      );
+      addLog(
+        `관리자가 ${character.name}의 ${STATUS_DEFINITIONS[removeStatusButton.dataset.removeStatus].name} 상태를 해제했습니다.`,
+      );
+      persistState();
+      renderAll();
       return;
     }
 
@@ -2009,6 +2105,24 @@
       return;
     }
 
+    if (action === "apply-status") {
+      const select =
+        elements.modal.querySelector("[data-status-select]") ||
+        elements.rightSidebar.querySelector("[data-status-select]");
+      const statusId = select?.value;
+      if (!statusId) return;
+      if (!character.statuses.includes(statusId))
+        character.statuses.push(statusId);
+      addLog(
+        `관리자가 ${character.name}에게 ${STATUS_DEFINITIONS[statusId].name} 상태를 적용했습니다.`,
+      );
+      persistState();
+      renderAll();
+      if (!elements.modalBackdrop.classList.contains("is-hidden"))
+        showCharacterManagementModal(character.id);
+      return;
+    }
+
     if (action === "toggle-force-move") {
       ui.adminTool = ui.adminTool === "forceMove" ? null : "forceMove";
       showToast(
@@ -2168,7 +2282,8 @@
     if (
       !character ||
       character.role !== "spirit" ||
-      character.floor !== floorId
+      character.floor !== floorId ||
+      character.statuses.includes("immobilized")
     )
       return reachable;
 
@@ -2213,6 +2328,22 @@
     return reachable;
   }
 
+  function canViewerSeeCharacterOnMap(viewer, character) {
+    if (!viewer || !character) return false;
+    if (Number(character.id) === Number(viewer.id)) return true;
+
+    /*
+     * 생환자는 동결체를 볼 수 없지만, 동결체는 같은 공간의 생환자를 볼 수 있습니다.
+     * 기존 코드는 역할이 다르면 양쪽 모두 숨겨서 동결체 화면에서도 생환자가
+     * 사라지는 문제가 있었습니다.
+     */
+    if (viewer.role === "survivor" && character.role === "spirit") {
+      return false;
+    }
+
+    return true;
+  }
+
   function getVisibleCharactersAtCell(floorId, x, y, perspective, visible) {
     if (!visible) return [];
     const characters = state.characters.filter(
@@ -2234,8 +2365,8 @@
     ]);
 
     return characters.filter((character) => {
+      if (!canViewerSeeCharacterOnMap(viewer, character)) return false;
       if (character.id === viewer.id) return true;
-      if (character.role !== viewer.role) return false;
       if (sharedIds.has(character.id)) return true;
       if (viewerRoomId === null) return false;
       return (
@@ -2512,6 +2643,7 @@
           if (session?.type === "admin") {
             const result = await remoteApi("save-state", {
               state: snapshot,
+              mapRules: createServerMapRules(),
               expectedVersion: remoteState.version,
             });
             remoteState.version = Number(result.version || remoteState.version);
@@ -2626,6 +2758,35 @@
     }
   }
 
+  async function syncRemoteMapRules() {
+    if (!session?.token || session.type !== "admin" || !isRemoteConfigured()) {
+      return false;
+    }
+
+    const result = await remoteApi("sync-map-rules", {
+      mapRules: createServerMapRules(),
+    });
+    remoteState.version = Number(result?.version || remoteState.version);
+    return true;
+  }
+
+  async function performRemoteSpiritBuildingMove(character, targetBuilding) {
+    if (!session?.token || session.type !== "player") return false;
+
+    const destination = buildingArrivalPoint(targetBuilding);
+    if (!destination) {
+      showToast("이동할 건물의 도착 지점을 찾지 못했습니다.");
+      return false;
+    }
+
+    return performRemoteSpiritMove(
+      character,
+      destination.floor,
+      destination.x,
+      destination.y,
+    );
+  }
+
   async function performRemoteInvestigation(investigationId) {
     if (!session?.token || session.type !== "player") return false;
     try {
@@ -2693,10 +2854,18 @@
       };
     });
 
+    const buildingArrivals = Object.fromEntries(
+      ["main", "living", "research", "support"].map((buildingId) => [
+        buildingId,
+        buildingArrivalPoint(buildingId),
+      ]),
+    );
+
     return {
-      schema: 1,
+      schema: 2,
       columns: GRID_COLUMNS,
       rows: GRID_ROWS,
+      buildingArrivals,
       floors,
     };
   }
@@ -2704,29 +2873,62 @@
   function createInitialState() {
     return {
       characters: [
-        createCharacter(101, "박무진", "survivor", 0, 0, "1F", 2, 3, true),
-        createCharacter(102, "강도겸", "spirit", 20, 20, "1F", 8, 4, true),
-        createCharacter(103, "설하린", "spirit", 20, 20, "1F", 2, 4, true),
-        createCharacter(104, "설하람", "survivor", 0, 0, "1F", 3, 3, true),
-        createCharacter(105, "백환", "survivor", 0, 0, "1F", 1, 6, false),
-        createCharacter(106, "가득순", "spirit", 20, 20, "B1", 9, 6, false),
-        createCharacter(107, "우혜인", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(108, "도하나", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(109, "야차", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(110, "연호연", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(111, "이건하", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(112, "유수담", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(113, "유애호", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(114, "사공이진", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(115, "권신예", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(116, "하설유", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(117, "하도야", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(118, "여 명", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(119, "무묘진", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(120, "박재안", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(121, "오현주", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(122, "염원", "survivor", 0, 0, "1F", 2, 3, false),
-        createCharacter(123, "신 결", "survivor", 0, 0, "1F", 2, 3, false),
+        createCharacter(101, "박무진", "survivor", 0, 0, "1F", 2, 3, [], true),
+        createCharacter(102, "강도겸", "spirit", 20, 20, "1F", 8, 4, [], true),
+        createCharacter(103, "설하린", "spirit", 20, 20, "1F", 2, 4, [], true),
+        createCharacter(
+          104,
+          "설하람",
+          "survivor",
+          0,
+          0,
+          "1F",
+          3,
+          3,
+          ["hypothermia"],
+          true,
+        ),
+        createCharacter(105, "백환", "survivor", 0, 0, "1F", 1, 6, [], false),
+        createCharacter(
+          106,
+          "가득순",
+          "spirit",
+          20,
+          20,
+          "B1",
+          9,
+          6,
+          ["unstable"],
+          false,
+        ),
+        createCharacter(107, "우혜인", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(108, "도하나", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(109, "야차", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(110, "연호연", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(111, "이건하", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(112, "유수담", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(113, "유애호", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(
+          114,
+          "사공이진",
+          "survivor",
+          0,
+          0,
+          "1F",
+          2,
+          3,
+          [],
+          false,
+        ),
+        createCharacter(115, "권신예", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(116, "하설유", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(117, "하도야", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(118, "여 명", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(119, "무묘진", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(120, "박재안", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(121, "오현주", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(122, "염원", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(123, "신 결", "survivor", 0, 0, "1F", 2, 3, [], false),
       ],
       teams: [
         {
@@ -2766,7 +2968,18 @@
     };
   }
 
-  function createCharacter(id, name, role, ap, maxAp, floor, x, y, online) {
+  function createCharacter(
+    id,
+    name,
+    role,
+    ap,
+    maxAp,
+    floor,
+    x,
+    y,
+    statuses,
+    online,
+  ) {
     return {
       id,
       name,
@@ -2778,6 +2991,7 @@
       floor,
       x,
       y,
+      statuses,
       inventory: [],
       investigations: [],
       records: [],
@@ -3521,7 +3735,7 @@
       if (!Array.isArray(character.investigations))
         character.investigations = [];
       if (!Array.isArray(character.records)) character.records = [];
-      if ("statuses" in character) delete character.statuses;
+      if (!Array.isArray(character.statuses)) character.statuses = [];
       character.inventory.forEach((item) => {
         if (!("imageData" in item)) item.imageData = null;
         if (!("fileName" in item)) item.fileName = null;
@@ -3532,7 +3746,9 @@
         character.spiritState = null;
         character.spiritSince = null;
       } else {
-        character.spiritState = character.spiritState || "stable";
+        character.spiritState =
+          character.spiritState ||
+          (character.statuses.includes("unstable") ? "unstable" : "stable");
         character.spiritSince =
           character.spiritSince ||
           new Date(Date.now() - (index + 1) * 36e5).toISOString();
@@ -3587,19 +3803,7 @@
           <td>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</td>
           <td><div class="compact-item-list">${itemNames}</div></td>
           <td><div class="spirit-state-cell">${spiritInfo}</div></td>
-          <td>${(() => {
-            const labels = [
-              ...(character.role === "survivor"
-                ? getInfectionStageEffects(character)
-                : []),
-              ...(character.manualStatuses || []).map((status) =>
-                `${status.bodyPart} ${status.severity}`.trim(),
-              ),
-            ].filter(Boolean);
-            return labels.length
-              ? labels.map((label) => escapeHtml(label)).join(", ")
-              : "없음";
-          })()}</td>
+          <td>${character.statuses.length ? character.statuses.map((statusId) => `<span class="status-icon" title="${escapeHtml(STATUS_DEFINITIONS[statusId]?.name || statusId)}">${STATUS_DEFINITIONS[statusId]?.icon || "·"}</span>`).join("") : "정상"}</td>
         </tr>`;
       })
       .join("");
@@ -5037,7 +5241,7 @@
       normalizeCharacterHealth(character);
       if ("online" in character) delete character.online;
       if (!Array.isArray(character.inventory)) character.inventory = [];
-      if ("statuses" in character) delete character.statuses;
+      if (!Array.isArray(character.statuses)) character.statuses = [];
       if (!Array.isArray(character.manualStatuses))
         character.manualStatuses = [];
       if (!Array.isArray(character.records)) character.records = [];
@@ -8660,9 +8864,14 @@
 
     elements.modalFooter
       .querySelector("[data-confirm-building-move]")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
         if (actor.ap < 5) {
           showToast("행동력이 부족합니다. 5가 필요합니다.");
+          return;
+        }
+
+        if (session?.type === "player" && session?.token) {
+          await performRemoteSpiritBuildingMove(actor, buildingId);
           return;
         }
 
@@ -8869,14 +9078,20 @@
       BUNKER_CENTER_POSITION.x,
       BUNKER_CENTER_POSITION.y,
       perspective,
-      exposure,
+      true,
     );
 
-    const tokens = visibleCharacters
+    const bunkerTokenSet = splitMapTokenCharacters(
+      visibleCharacters,
+      perspective,
+      movementActor,
+    );
+    const tokens = bunkerTokenSet.visible
       .map((character) =>
         tokenMarkup(character, character.id === movementActor?.id),
       )
       .join("");
+    const overflowTokens = mapTokenOverflowMarkup(bunkerTokenSet.hidden);
 
     const canReturnToA =
       session.type === "player" &&
@@ -8893,7 +9108,7 @@
           <div class="bunker-center-map__device">
             <span>생체동결전이장치</span>
           </div>
-          <div class="bunker-center-map__tokens">${tokens}</div>
+          <div class="bunker-center-map__tokens">${tokens}${overflowTokens}</div>
         </div>
         <div class="bunker-center-map__connector" aria-label="A 구역 연결 통로">
           ${
@@ -8907,6 +9122,342 @@
 
     elements.warmthBanner?.classList.add("is-hidden");
     updateMovementRule(movementActor);
+  }
+
+  /*
+   * 지도 토큰은 x/y 셀이 아니라 최종 roomId를 기준으로 묶습니다.
+   *
+   * 중요한 점:
+   * - floor.rooms에 직접 선언된 방뿐 아니라 defaultRoom/복도/로비처럼
+   *   floor.cells에만 남는 공간도 동일하게 하나의 공간으로 취급합니다.
+   * - 실제 x/y 좌표는 이동/AP/서버 저장용으로 그대로 유지합니다.
+   * - 지도에 그릴 때만 같은 roomId의 캐릭터를 한 묶음으로 표시합니다.
+   */
+  function getFloorRoomTokenZones(floor) {
+    if (!floor?.cells) return [];
+
+    const groups = new Map();
+
+    Object.values(floor.cells).forEach((cell) => {
+      if (!cell?.roomId) return;
+      if (!groups.has(cell.roomId)) {
+        groups.set(cell.roomId, {
+          roomId: cell.roomId,
+          roomLabel: cell.roomLabel || cell.roomId,
+          cells: [],
+        });
+      }
+      groups.get(cell.roomId).cells.push(cell);
+    });
+
+    return [...groups.values()].map((group) => {
+      const xs = group.cells.map((cell) => Number(cell.x));
+      const ys = group.cells.map((cell) => Number(cell.y));
+      const x1 = Math.min(...xs);
+      const x2 = Math.max(...xs);
+      const y1 = Math.min(...ys);
+      const y2 = Math.max(...ys);
+
+      return {
+        ...group,
+        x1,
+        x2,
+        y1,
+        y2,
+        columns: x2 - x1 + 1,
+        rows: y2 - y1 + 1,
+        // 실제 roomId에 속한 셀 수를 공간 면적으로 사용합니다.
+        // bounding box 크기가 아니라 실제 칸 수이므로 꺾인 방/복도도 정확합니다.
+        cellCount: group.cells.length,
+      };
+    });
+  }
+
+  /*
+   * 공간 면적에 따른 지도 토큰 표시 수
+   * - 1칸 공간: 1명 + N명
+   * - 2칸 공간: 2명 + N명
+   * - ...
+   * - 6칸 이상: 최대 6명 + N명
+   *
+   * 본인(또는 관리자 선택 캐릭터)은 splitMapTokenCharacters에서
+   * 항상 표시 인원 안에 우선 포함됩니다.
+   */
+  function mapVisibleTokenLimitForZone(zone) {
+    const roomCells = Math.max(1, Number(zone?.cellCount || 1));
+    return Math.min(MAX_MAP_VISIBLE_TOKENS, roomCells);
+  }
+
+  function getVisibleCharactersInRoomId(floorId, roomId, perspective) {
+    if (!floorId || !roomId) return [];
+
+    const characters = state.characters.filter(
+      (character) =>
+        character.floor === floorId &&
+        getRoomId(character.floor, character.x, character.y) === roomId,
+    );
+
+    if (perspective.mode === "admin") return characters;
+    if (!perspective.character) return [];
+
+    const viewer = perspective.character;
+    const viewerRoomId =
+      viewer.floor === floorId
+        ? getRoomId(viewer.floor, viewer.x, viewer.y)
+        : null;
+    const visibleTeams = getVisibleTeamsForCharacter(viewer.id);
+    const sharedIds = new Set([
+      viewer.id,
+      ...visibleTeams.flatMap((team) => team.memberIds),
+    ]);
+
+    return characters.filter((character) => {
+      if (!canViewerSeeCharacterOnMap(viewer, character)) return false;
+      if (Number(character.id) === Number(viewer.id)) return true;
+      if (sharedIds.has(character.id)) return true;
+      return viewerRoomId === roomId;
+    });
+  }
+
+  const MAX_MAP_VISIBLE_TOKENS = 6;
+
+  function splitMapTokenCharacters(
+    characters,
+    perspective,
+    movementActor,
+    maxVisible = MAX_MAP_VISIBLE_TOKENS,
+  ) {
+    const ordered = [...characters].sort((a, b) => Number(a.id) - Number(b.id));
+    const requiredId =
+      perspective?.mode === "player"
+        ? perspective.character?.id
+        : movementActor?.id;
+
+    if (requiredId != null) {
+      const requiredIndex = ordered.findIndex(
+        (character) => Number(character.id) === Number(requiredId),
+      );
+
+      if (requiredIndex >= maxVisible) {
+        const [requiredCharacter] = ordered.splice(requiredIndex, 1);
+        ordered.unshift(requiredCharacter);
+      }
+    }
+
+    return {
+      visible: ordered.slice(0, maxVisible),
+      hidden: ordered.slice(maxVisible),
+    };
+  }
+
+  function mapTokenOverflowMarkup(hiddenCharacters) {
+    if (!hiddenCharacters.length) return "";
+
+    const names = hiddenCharacters
+      .map(
+        (character) =>
+          `<span class="map-token-overflow-list__name">${escapeHtml(character.name)}</span>`,
+      )
+      .join("");
+
+    return `
+      <span class="map-token-overflow-wrap">
+        <span
+          class="map-token-overflow"
+          data-token-overflow-toggle
+          role="button"
+          tabindex="0"
+          aria-expanded="false"
+          aria-label="숨겨진 인원 ${hiddenCharacters.length}명 보기"
+        >+${hiddenCharacters.length}명</span>
+        <span class="map-token-overflow-list" role="tooltip">
+          <strong>같은 위치 · ${hiddenCharacters.length}명</strong>
+          <span class="map-token-overflow-list__names">${names}</span>
+        </span>
+      </span>
+    `;
+  }
+
+  let activeMapTokenOverflowWrapper = null;
+  let mapTokenOverflowPortal = null;
+  let mapTokenOverflowHideTimer = 0;
+
+  function ensureMapTokenOverflowPortal() {
+    if (mapTokenOverflowPortal?.isConnected) return mapTokenOverflowPortal;
+
+    const portal = document.createElement("div");
+    portal.className = "map-token-overflow-portal";
+    portal.setAttribute("role", "tooltip");
+    portal.setAttribute("aria-hidden", "true");
+    document.body.appendChild(portal);
+
+    portal.addEventListener("pointerenter", () => {
+      window.clearTimeout(mapTokenOverflowHideTimer);
+    });
+    portal.addEventListener("pointerleave", () => {
+      if (!activeMapTokenOverflowWrapper?.classList.contains("is-open")) {
+        hideMapTokenOverflowPortal();
+      }
+    });
+
+    mapTokenOverflowPortal = portal;
+    return portal;
+  }
+
+  function positionMapTokenOverflowList(wrapper) {
+    if (!wrapper) return;
+    const toggle = wrapper.querySelector("[data-token-overflow-toggle]");
+    const source = wrapper.querySelector(".map-token-overflow-list");
+    if (!toggle || !source) return;
+
+    const portal = ensureMapTokenOverflowPortal();
+    portal.innerHTML = source.innerHTML;
+    portal.classList.add("is-visible");
+    portal.setAttribute("aria-hidden", "false");
+    activeMapTokenOverflowWrapper = wrapper;
+
+    const toggleRect = toggle.getBoundingClientRect();
+    const portalRect = portal.getBoundingClientRect();
+    const gap = 10;
+    const viewportPadding = 10;
+
+    const clampLeft = (value) =>
+      Math.max(
+        viewportPadding,
+        Math.min(value, window.innerWidth - portalRect.width - viewportPadding),
+      );
+    const clampTop = (value) =>
+      Math.max(
+        viewportPadding,
+        Math.min(
+          value,
+          window.innerHeight - portalRect.height - viewportPadding,
+        ),
+      );
+
+    const rightLeft = clampLeft(toggleRect.right + gap);
+    const leftLeft = clampLeft(toggleRect.left - gap - portalRect.width);
+    const centeredTop = clampTop(
+      toggleRect.top + toggleRect.height / 2 - portalRect.height / 2,
+    );
+
+    const topCandidates = [
+      centeredTop,
+      clampTop(toggleRect.bottom + gap),
+      clampTop(toggleRect.top - portalRect.height - gap),
+    ];
+
+    const tokenRects = [...document.querySelectorAll(".character-token")]
+      .filter((token) => token.offsetParent !== null)
+      .map((token) => token.getBoundingClientRect());
+
+    const overlapArea = (a, b) => {
+      const width = Math.max(
+        0,
+        Math.min(a.right, b.right) - Math.max(a.left, b.left),
+      );
+      const height = Math.max(
+        0,
+        Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top),
+      );
+      return width * height;
+    };
+
+    const candidates = [];
+    for (const left of [rightLeft, leftLeft]) {
+      for (const top of topCandidates) {
+        const rect = {
+          left,
+          top,
+          right: left + portalRect.width,
+          bottom: top + portalRect.height,
+        };
+        const tokenOverlap = tokenRects.reduce(
+          (sum, tokenRect) => sum + overlapArea(rect, tokenRect),
+          0,
+        );
+        const distance =
+          Math.abs(left - toggleRect.left) + Math.abs(top - centeredTop) * 0.15;
+        candidates.push({ left, top, tokenOverlap, distance });
+      }
+    }
+
+    candidates.sort(
+      (a, b) => a.tokenOverlap - b.tokenOverlap || a.distance - b.distance,
+    );
+
+    const best = candidates[0];
+    portal.style.left = `${Math.round(best.left)}px`;
+    portal.style.top = `${Math.round(best.top)}px`;
+  }
+
+  function hideMapTokenOverflowPortal() {
+    window.clearTimeout(mapTokenOverflowHideTimer);
+    if (mapTokenOverflowPortal) {
+      mapTokenOverflowPortal.classList.remove("is-visible");
+      mapTokenOverflowPortal.setAttribute("aria-hidden", "true");
+    }
+    if (!activeMapTokenOverflowWrapper?.classList.contains("is-open")) {
+      activeMapTokenOverflowWrapper = null;
+    }
+  }
+
+  function scheduleHideMapTokenOverflowPortal() {
+    window.clearTimeout(mapTokenOverflowHideTimer);
+    mapTokenOverflowHideTimer = window.setTimeout(() => {
+      if (!activeMapTokenOverflowWrapper?.classList.contains("is-open")) {
+        hideMapTokenOverflowPortal();
+      }
+    }, 120);
+  }
+
+  function positionMapTokenOverflowBadge(wrapper) {
+    if (!wrapper) return;
+
+    const zone = wrapper.closest(".map-room-token-zone");
+    if (!zone) return;
+
+    const tokenGroups = [
+      ...zone.querySelectorAll(".map-room-token-zone__tokens"),
+    ].filter((group) => group.querySelector(".character-token"));
+
+    const tokenGroup = tokenGroups[tokenGroups.length - 1];
+    if (!tokenGroup) return;
+
+    const tokens = [...tokenGroup.querySelectorAll(".character-token")];
+    const lastToken = tokens[tokens.length - 1];
+    if (!lastToken) return;
+
+    const zoneRect = zone.getBoundingClientRect();
+    const lastRect = lastToken.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const gap = 9;
+
+    let left = lastRect.right - zoneRect.left + gap;
+    let top =
+      lastRect.top -
+      zoneRect.top +
+      lastRect.height / 2 -
+      wrapperRect.height / 2;
+
+    wrapper.style.left = `${Math.round(left)}px`;
+    wrapper.style.top = `${Math.round(top)}px`;
+    wrapper.style.right = "auto";
+    wrapper.style.bottom = "auto";
+    wrapper.style.transform = "none";
+    wrapper.classList.add("is-badge-positioned");
+  }
+
+  function positionAllMapTokenOverflowBadges() {
+    document
+      .querySelectorAll(".map-room-token-zone > .map-token-overflow-wrap")
+      .forEach((wrapper) => positionMapTokenOverflowBadge(wrapper));
+  }
+
+  function positionAllOpenMapTokenOverflowLists() {
+    if (activeMapTokenOverflowWrapper) {
+      positionMapTokenOverflowList(activeMapTokenOverflowWrapper);
+    }
   }
 
   function renderMap() {
@@ -8978,6 +9529,8 @@
     );
     elements.mapGrid.innerHTML = "";
 
+    const canShowPositions = !exposure || exposure.mapInfo.teamPositions;
+
     floor.rooms.forEach((roomDefinition) => {
       const roomElement = document.createElement("div");
       roomElement.className = `map-room${roomDefinition.restricted ? " is-restricted-room" : ""}`;
@@ -8992,10 +9545,18 @@
         roomElement.classList.add("is-active-room");
       if (warmth.active && roomDefinition.id === warmth.roomId)
         roomElement.classList.add("is-warm");
+      if (floor.id === "1F" && roomDefinition.id === "auditorium")
+        roomElement.classList.add("map-room--auditorium-token-layout");
 
       const roomLabelMarkup = roomDefinition.hideLabel
         ? ""
-        : `<span>${escapeHtml(roomDefinition.label)}</span>`;
+        : `<span class="map-room__label">${escapeHtml(roomDefinition.label)}</span>`;
+
+      /*
+       * 캐릭터 토큰은 아래의 공통 roomId 토큰 레이어에서 한 번만 렌더링합니다.
+       * 이 방 DOM은 기존 지도 비율/방 모양/라벨만 담당합니다.
+       */
+      const roomTokenMarkup = "";
 
       /*
        * 공간 배속 정보는 오직 관리자 계정의 '관리자 시점'에서만 표시한다.
@@ -9016,7 +9577,8 @@
             </span>`
         : "";
 
-      roomElement.innerHTML = roomLabelMarkup + adminSpaceMultiplierBadge;
+      roomElement.innerHTML =
+        roomLabelMarkup + adminSpaceMultiplierBadge + roomTokenMarkup;
 
       elements.mapGrid.appendChild(roomElement);
     });
@@ -9093,27 +9655,10 @@
           exposure,
         );
 
-        const canShowPositions = !exposure || exposure.mapInfo.teamPositions;
-        const visibleCharacters = getVisibleCharactersAtCell(
-          floor.id,
-          x,
-          y,
-          perspective,
-          true,
-        ).filter(
-          (character) =>
-            character.id === movementActor.id ||
-            canShowPositions ||
-            getRoomId(character.floor, character.x, character.y) ===
-              activeRoomId,
-        );
-
-        visibleCharacters.forEach((character) => {
-          cellElement.insertAdjacentHTML(
-            "beforeend",
-            tokenMarkup(character, character.id === movementActor.id),
-          );
-        });
+        /*
+         * 캐릭터는 모든 지도에서 roomId 단위 공통 레이어로 렌더링합니다.
+         * 셀 버튼에는 이동/조사/층 이동 UI만 남깁니다.
+         */
 
         /*
          * 동결체 본인이 실제 계단/비상계단 방에 있을 때만
@@ -9234,6 +9779,101 @@
         elements.mapGrid.appendChild(cellElement);
       }
     }
+
+    /*
+     * 모든 층/모든 방의 캐릭터를 동일한 방식으로 표시합니다.
+     * floor.rooms에 직접 선언되지 않은 defaultRoom도 floor.cells의 roomId를
+     * 기준으로 포함되므로, 지도 개편 뒤 같은 공간이 여러 셀로 갈라져 보이는
+     * 문제를 방지합니다.
+     */
+    getFloorRoomTokenZones(floor).forEach((zone) => {
+      const roomCharacters = getVisibleCharactersInRoomId(
+        floor.id,
+        zone.roomId,
+        perspective,
+      ).filter(
+        (character) =>
+          Number(character.id) === Number(movementActor?.id) ||
+          canShowPositions ||
+          zone.roomId === activeRoomId,
+      );
+
+      if (!roomCharacters.length) return;
+
+      const roomTokenLimit = mapVisibleTokenLimitForZone(zone);
+      const tokenSet = splitMapTokenCharacters(
+        roomCharacters,
+        perspective,
+        movementActor,
+        roomTokenLimit,
+      );
+
+      const zoneElement = document.createElement("div");
+      zoneElement.className = "map-room-token-zone";
+      zoneElement.dataset.roomId = zone.roomId;
+      zoneElement.dataset.roomColumns = String(zone.columns);
+      zoneElement.dataset.roomRows = String(zone.rows);
+      zoneElement.dataset.roomCells = String(zone.cellCount);
+      zoneElement.dataset.tokenLimit = String(roomTokenLimit);
+      zoneElement.style.gridColumn = `${zone.x1 + 1} / ${zone.x2 + 2}`;
+      zoneElement.style.gridRow = `${zone.y1 + 1} / ${zone.y2 + 2}`;
+
+      if (zone.columns >= 3) zoneElement.classList.add("is-wide");
+      if (zone.columns <= 2 || zone.rows <= 2)
+        zoneElement.classList.add("is-compact");
+      if (floor.id === "1F" && zone.roomId === "auditorium")
+        zoneElement.classList.add("is-auditorium");
+
+      const tokenItems = tokenSet.visible
+        .map((character) =>
+          tokenMarkup(
+            character,
+            Number(character.id) === Number(movementActor?.id),
+          ),
+        )
+        .join("");
+
+      if (zoneElement.classList.contains("is-auditorium")) {
+        const splitIndex = Math.ceil(tokenSet.visible.length / 2);
+        const upper = tokenSet.visible.slice(0, splitIndex);
+        const lower = tokenSet.visible.slice(splitIndex);
+        zoneElement.innerHTML = `
+          <div class="map-room-token-zone__tokens map-room-token-zone__tokens--upper">
+            ${upper
+              .map((character) =>
+                tokenMarkup(
+                  character,
+                  Number(character.id) === Number(movementActor?.id),
+                ),
+              )
+              .join("")}
+          </div>
+          <div class="map-room-token-zone__tokens map-room-token-zone__tokens--lower">
+            ${lower
+              .map((character) =>
+                tokenMarkup(
+                  character,
+                  Number(character.id) === Number(movementActor?.id),
+                ),
+              )
+              .join("")}
+          </div>
+          ${mapTokenOverflowMarkup(tokenSet.hidden)}
+        `;
+      } else {
+        zoneElement.innerHTML = `
+          <div class="map-room-token-zone__tokens">${tokenItems}</div>
+          ${mapTokenOverflowMarkup(tokenSet.hidden)}
+        `;
+      }
+
+      elements.mapGrid.appendChild(zoneElement);
+    });
+
+    window.requestAnimationFrame(() => {
+      positionAllMapTokenOverflowBadges();
+      positionAllOpenMapTokenOverflowLists();
+    });
 
     renderWarmthBanner(warmth, perspective);
     updateMovementRule(movementActor);
@@ -10314,6 +10954,42 @@
       return;
     }
 
+    const tokenOverflowToggle = event.target.closest(
+      "[data-token-overflow-toggle]",
+    );
+    if (tokenOverflowToggle) {
+      const wrapper = tokenOverflowToggle.closest(".map-token-overflow-wrap");
+      const wasOpen = wrapper?.classList.contains("is-open");
+      document
+        .querySelectorAll(".map-token-overflow-wrap.is-open")
+        .forEach((element) => {
+          element.classList.remove("is-open");
+          element
+            .querySelector("[data-token-overflow-toggle]")
+            ?.setAttribute("aria-expanded", "false");
+        });
+      if (wrapper && !wasOpen) {
+        wrapper.classList.add("is-open");
+        tokenOverflowToggle.setAttribute("aria-expanded", "true");
+        positionMapTokenOverflowList(wrapper);
+      } else if (wasOpen) {
+        activeMapTokenOverflowWrapper = null;
+        hideMapTokenOverflowPortal();
+      }
+      return;
+    }
+
+    document
+      .querySelectorAll(".map-token-overflow-wrap.is-open")
+      .forEach((element) => {
+        element.classList.remove("is-open");
+        element
+          .querySelector("[data-token-overflow-toggle]")
+          ?.setAttribute("aria-expanded", "false");
+      });
+    activeMapTokenOverflowWrapper = null;
+    hideMapTokenOverflowPortal();
+
     const tokenElement = event.target.closest("[data-token-character]");
     if (tokenElement && session.type === "admin" && !ui.adminTool) {
       const character = getCharacter(
@@ -11003,6 +11679,44 @@
     "DOMContentLoaded",
     installCommonSelectEnhancements,
   );
+
+  document.addEventListener("pointerover", (event) => {
+    const wrapper = event.target.closest?.(".map-token-overflow-wrap");
+    if (!wrapper) return;
+    if (event.relatedTarget && wrapper.contains(event.relatedTarget)) return;
+    window.clearTimeout(mapTokenOverflowHideTimer);
+    positionMapTokenOverflowList(wrapper);
+  });
+
+  document.addEventListener("pointerout", (event) => {
+    const wrapper = event.target.closest?.(".map-token-overflow-wrap");
+    if (!wrapper) return;
+    if (event.relatedTarget && wrapper.contains(event.relatedTarget)) return;
+    if (!wrapper.classList.contains("is-open")) {
+      scheduleHideMapTokenOverflowPortal();
+    }
+  });
+
+  document.addEventListener("focusin", (event) => {
+    const wrapper = event.target.closest?.(".map-token-overflow-wrap");
+    if (wrapper) {
+      window.clearTimeout(mapTokenOverflowHideTimer);
+      positionMapTokenOverflowList(wrapper);
+    }
+  });
+
+  document.addEventListener("focusout", (event) => {
+    const wrapper = event.target.closest?.(".map-token-overflow-wrap");
+    if (wrapper && !wrapper.classList.contains("is-open")) {
+      scheduleHideMapTokenOverflowPortal();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    positionAllMapTokenOverflowBadges();
+    positionAllOpenMapTokenOverflowLists();
+  });
+  window.addEventListener("scroll", positionAllOpenMapTokenOverflowLists, true);
 
   document.addEventListener("DOMContentLoaded", installCampusMapEnhancements);
 })();
