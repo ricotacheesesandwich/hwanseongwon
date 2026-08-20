@@ -1142,7 +1142,7 @@
                 <button type="button" class="button button--small" data-admin-action="ap-plus-3">+3</button>
                 <button type="button" class="button button--small" data-admin-action="ap-max">최대</button>
               </div>
-              <p class="login-card__footnote">현재 행동력 ${selected.ap} / ${selected.maxAp} · 공간 변경 1회당 1 소모</p>
+              <p class="login-card__footnote">현재 행동력 <span data-admin-live-ap="${selected.id}">${selected.ap} / ${selected.maxAp}</span> · 공간 변경 1회당 1 소모</p>
             </div>
           </section>`
           : `
@@ -2737,6 +2737,7 @@
 
       if (session) {
         renderAll();
+        syncOpenAdminCharacterLiveFields();
         notifyNewEmergencyEvents(previousUnreadCount);
       }
 
@@ -5988,6 +5989,19 @@
     elements.leftSidebar.innerHTML = `<div class="sidebar-header"><h2>내 캐릭터</h2>${roleChipMarkup(character.role)}</div><div class="player-profile"><div class="player-profile__identity">${avatarMarkup(character)}<div class="player-profile__identity-copy"><h2>${escapeHtml(character.name)}</h2>${character.role === "survivor" ? `<div class="player-profile__health">${healthGaugeMarkup(character, true)}</div>` : ""}</div></div><div class="stat-grid"><div class="stat-card"><span>현재 위치</span><strong>${escapeHtml(characterLocationText(character))}</strong></div>${movementCard}</div>${apMeter}<section><p class="eyebrow">MY GROUPS</p><div class="team-summary-list">${teamMarkup}</div><div class="shared-member-list">${sharedMemberMarkup}</div></section><section><p class="eyebrow">STATUS EFFECTS</p><div class="status-list" data-character-status-effects="${character.id}">${statuses}</div></section>${spiritGuide}</div>`;
   }
 
+  function syncOpenAdminCharacterLiveFields() {
+    if (session?.type !== "admin") return;
+
+    const selected = getCharacter(ui.selectedCharacterId);
+    if (!selected) return;
+
+    document
+      .querySelectorAll(`[data-admin-live-ap="${selected.id}"]`)
+      .forEach((node) => {
+        node.textContent = `${selected.ap} / ${selected.maxAp}`;
+      });
+  }
+
   function showCharacterManagementModal(characterId = ui.selectedCharacterId) {
     const selected = getCharacter(characterId);
     if (!selected) return;
@@ -6011,7 +6025,7 @@
       ? `<div class="modal-control-card admin-character-control-card admin-character-control-card--ap">
           <div class="modal-control-card__title">
             <strong>행동력</strong>
-            <span>${selected.ap} / ${selected.maxAp}</span>
+            <span data-admin-live-ap="${selected.id}">${selected.ap} / ${selected.maxAp}</span>
           </div>
           <p>다른 공간으로 이동할 때마다 행동력 1이 차감됩니다.</p>
           <div class="ap-custom-adjust">
