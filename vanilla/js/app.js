@@ -208,6 +208,8 @@
     applying: false,
     writeQueue: Promise.resolve(),
     realtimeChannel: null,
+    movementInFlight: false,
+    pendingRealtimeVersion: 0,
   };
 
   let session = null;
@@ -461,6 +463,21 @@
         async (payload) => {
           const incomingVersion = Number(payload.new?.version || 0);
           if (!session?.token || incomingVersion <= remoteState.version) return;
+
+          /*
+           * 이동 API 응답과 Realtime get-state 응답이 서로 앞뒤로 도착하면
+           * 예전 위치가 최신 위치를 덮어쓰는 경쟁 상태가 생길 수 있습니다.
+           * 이동 처리 중에는 Realtime 갱신을 잠시 보류하고,
+           * 이동 응답 적용 후 더 높은 버전이 있을 때만 한 번 다시 읽습니다.
+           */
+          if (remoteState.movementInFlight) {
+            remoteState.pendingRealtimeVersion = Math.max(
+              remoteState.pendingRealtimeVersion,
+              incomingVersion,
+            );
+            return;
+          }
+
           await refreshRemoteState({ quiet: true });
         },
       )
@@ -2656,14 +2673,20 @@
               mapRules: createServerMapRules(),
               expectedVersion: remoteState.version,
             });
-            remoteState.version = Number(result.version || remoteState.version);
+            remoteState.version = Math.max(
+              remoteState.version,
+              Number(result.version || 0),
+            );
             return;
           }
 
           const result = await remoteApi("save-player-state", {
             state: snapshot,
           });
-          remoteState.version = Number(result.version || remoteState.version);
+          remoteState.version = Math.max(
+            remoteState.version,
+            Number(result.version || 0),
+          );
         } catch (error) {
           console.error("서버 상태 저장 실패", error);
           if (error.status === 409) {
@@ -2691,10 +2714,22 @@
     try {
       const result = await remoteApi("get-state");
       if (!result?.state) return false;
+
+      const incomingVersion = Number(result.version || 0);
+
+      /*
+       * 이미 더 최신 버전을 적용한 뒤 늦게 도착한 get-state 응답은 버립니다.
+       * 이 검사가 없으면 층/건물 이동 직후 이전 위치가 잠깐 다시 적용되어
+       * 첫 번째 다음 이동이 '같은 공간 이동'으로 잘못 계산될 수 있습니다.
+       */
+      if (incomingVersion < remoteState.version) {
+        return false;
+      }
+
       remoteState.applying = true;
       try {
         state = ensureFeatureState(result.state);
-        remoteState.version = Number(result.version || 0);
+        remoteState.version = incomingVersion;
         storage.setItem(STORAGE_KEY, JSON.stringify(state));
       } finally {
         remoteState.applying = false;
@@ -2720,7 +2755,15 @@
     y = null,
   ) {
     if (!session?.token || session.type !== "player") return false;
+
+    if (remoteState.movementInFlight) {
+      showToast("이동 처리 중입니다. 잠시만 기다려 주세요.");
+      return false;
+    }
+
     const previousFloor = String(character?.floor || "");
+    remoteState.movementInFlight = true;
+
     try {
       const result = await remoteApi("move-spirit", {
         targetFloor,
@@ -2729,13 +2772,21 @@
       });
       if (!result?.state) throw new Error("MOVE_RESPONSE_INVALID");
 
-      remoteState.applying = true;
-      try {
-        state = ensureFeatureState(result.state);
-        remoteState.version = Number(result.version || 0);
-        storage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } finally {
-        remoteState.applying = false;
+      const incomingVersion = Number(result.version || 0);
+
+      /*
+       * 이동 응답은 서버가 확정한 위치이므로 같은 버전 이상일 때만 적용합니다.
+       * 이미 더 최신 Realtime 상태가 적용되어 있다면 오래된 응답으로 되돌리지 않습니다.
+       */
+      if (incomingVersion >= remoteState.version) {
+        remoteState.applying = true;
+        try {
+          state = ensureFeatureState(result.state);
+          remoteState.version = incomingVersion;
+          storage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } finally {
+          remoteState.applying = false;
+        }
       }
 
       const moved = getCharacter(session.characterId);
@@ -2744,8 +2795,10 @@
         ui.currentBuilding = buildingFromFloorKey(moved.floor);
         ui.mapMode = "floor";
       }
+
       closeModal();
       renderAll();
+
       showToast(
         result.cost > 0
           ? `행동력 ${result.cost}을 사용해 이동했습니다.`
@@ -2756,8 +2809,8 @@
       return true;
     } catch (error) {
       console.error("서버 이동 처리 실패", error);
-      await refreshRemoteState({ quiet: true });
       closeModal();
+
       if (error.status === 403) {
         showToast("이 계정으로는 해당 이동을 할 수 없습니다.");
       } else if (error.code === "NOT_ENOUGH_AP") {
@@ -2767,7 +2820,22 @@
       } else {
         showToast("이동 처리에 실패했습니다. 최신 상태를 확인해 주세요.");
       }
+
+      await refreshRemoteState({ quiet: true });
       return false;
+    } finally {
+      remoteState.movementInFlight = false;
+
+      const pendingVersion = remoteState.pendingRealtimeVersion;
+      remoteState.pendingRealtimeVersion = 0;
+
+      if (pendingVersion > remoteState.version && session?.token) {
+        window.setTimeout(() => {
+          refreshRemoteState({ quiet: true }).catch((error) =>
+            console.error("이동 후 Realtime 동기화 실패", error),
+          );
+        }, 0);
+      }
     }
   }
 
@@ -2779,7 +2847,10 @@
     const result = await remoteApi("sync-map-rules", {
       mapRules: createServerMapRules(),
     });
-    remoteState.version = Number(result?.version || remoteState.version);
+    remoteState.version = Math.max(
+      remoteState.version,
+      Number(result?.version || 0),
+    );
     return true;
   }
 
@@ -9263,14 +9334,52 @@
     };
   }
 
+  function openAdminCharacterManagementFromMap(characterId) {
+    if (session?.type !== "admin" || ui.adminTool) return false;
+
+    const character = getCharacter(Number(characterId));
+    if (!character) return false;
+
+    document
+      .querySelectorAll(".map-token-overflow-wrap.is-open")
+      .forEach((element) => {
+        element.classList.remove("is-open");
+        element
+          .querySelector("[data-token-overflow-toggle]")
+          ?.setAttribute("aria-expanded", "false");
+      });
+
+    activeMapTokenOverflowWrapper = null;
+    hideMapTokenOverflowPortal();
+
+    ui.selectedCharacterId = character.id;
+    ui.currentFloor = character.floor;
+    ui.currentBuilding = buildingFromFloorKey(character.floor);
+    ui.mapMode = "floor";
+
+    renderAll();
+    showCharacterManagementModal(character.id);
+    return true;
+  }
+
   function mapTokenOverflowMarkup(hiddenCharacters) {
     if (!hiddenCharacters.length) return "";
 
     const names = hiddenCharacters
-      .map(
-        (character) =>
-          `<span class="map-token-overflow-list__name">${escapeHtml(character.name)}</span>`,
-      )
+      .map((character) => {
+        const name = escapeHtml(character.name);
+
+        if (session?.type === "admin") {
+          return `<button
+            type="button"
+            class="map-token-overflow-list__name map-token-overflow-list__name--admin"
+            data-admin-overflow-character="${character.id}"
+            aria-label="${name} 캐릭터 관리 열기"
+          >${name}</button>`;
+        }
+
+        return `<span class="map-token-overflow-list__name">${name}</span>`;
+      })
       .join("");
 
     return `
@@ -9311,6 +9420,23 @@
       if (!activeMapTokenOverflowWrapper?.classList.contains("is-open")) {
         hideMapTokenOverflowPortal();
       }
+    });
+
+    /*
+     * +N명 팝업은 document.body 아래의 포털이므로 mapGrid 클릭 이벤트의
+     * 범위 밖입니다. 관리자일 때만 이름을 눌러 캐릭터 관리창을 엽니다.
+     */
+    portal.addEventListener("click", (event) => {
+      const characterButton = event.target.closest(
+        "[data-admin-overflow-character]",
+      );
+      if (!characterButton || session?.type !== "admin") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      openAdminCharacterManagementFromMap(
+        Number(characterButton.dataset.adminOverflowCharacter),
+      );
     });
 
     mapTokenOverflowPortal = portal;
@@ -10967,6 +11093,19 @@
   }
 
   function handleMapClick(event) {
+    /*
+     * 관리자 지도에서는 어떤 종류의 지도 토큰이든 클릭을 최우선 처리합니다.
+     * 방 이동/건물 이동/계단 버튼보다 먼저 검사해 겹친 영역에서도
+     * 캐릭터 관리창이 일관되게 열리도록 합니다.
+     */
+    const tokenElement = event.target.closest("[data-token-character]");
+    if (tokenElement && session.type === "admin") {
+      openAdminCharacterManagementFromMap(
+        Number(tokenElement.dataset.tokenCharacter),
+      );
+      return;
+    }
+
     const bunkerCenterEntryButton = event.target.closest(
       "[data-open-bunker-center-entry]",
     );
@@ -11067,22 +11206,6 @@
       });
     activeMapTokenOverflowWrapper = null;
     hideMapTokenOverflowPortal();
-
-    const tokenElement = event.target.closest("[data-token-character]");
-    if (tokenElement && session.type === "admin" && !ui.adminTool) {
-      const character = getCharacter(
-        Number(tokenElement.dataset.tokenCharacter),
-      );
-      if (character) {
-        ui.selectedCharacterId = character.id;
-        ui.currentFloor = character.floor;
-        ui.currentBuilding = buildingFromFloorKey(character.floor);
-        ui.mapMode = "floor";
-        renderAll();
-        showCharacterManagementModal(character.id);
-      }
-      return;
-    }
 
     const cellElement = event.target.closest(".map-cell");
     if (!cellElement || ui.mapMode === "site") return;

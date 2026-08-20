@@ -13150,3 +13150,850 @@ body.login-theme .login-result-card {
     padding: 22px;
   }
 }
+
+/* =========================================================
+   방 단위 토큰 표시 V4
+   - 모든 층의 명시된 방을 하나의 위치 단위로 취급
+   - 실제 지도 grid / 방 크기 / 비율은 변경하지 않음
+   - 같은 방 인원은 최대 6명 + N명으로 표시
+   - 대강당 이름은 정중앙 유지
+   ========================================================= */
+
+.map-grid .map-room.map-room--room-token-layout {
+  position: relative;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   대강당 전용: 방 이름 중앙 + 토큰을 위/아래로 분리
+   --------------------------------------------------------- */
+.map-grid .map-room.map-room--auditorium-token-layout > .map-room__label {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  width: max-content;
+  max-width: 80%;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  color: var(--navy-900);
+  box-shadow: none;
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.map-grid .map-room.map-room--auditorium-token-layout .map-room__tokens {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  display: grid;
+  width: min(calc(100% - 36px), 680px);
+  grid-template-columns: repeat(auto-fit, 52px);
+  justify-content: center;
+  align-content: center;
+  gap: 10px 12px;
+  transform: translateX(-50%);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.map-grid .map-room.map-room--auditorium-token-layout .map-room__tokens--upper {
+  top: 10%;
+  bottom: 57%;
+}
+
+.map-grid .map-room.map-room--auditorium-token-layout .map-room__tokens--lower {
+  top: 58%;
+  bottom: 9%;
+}
+
+/* ---------------------------------------------------------
+   일반 방: 방 자체 크기는 건드리지 않고 내부에서 최대 6명 정렬
+   --------------------------------------------------------- */
+.map-grid .map-room.map-room--room-token-layout .map-room__tokens--all {
+  position: absolute;
+  z-index: 7;
+  inset: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 38px);
+  grid-auto-rows: 38px;
+  place-content: center;
+  gap: 5px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.map-grid
+  .map-room.map-room--room-token-layout.map-room--token-wide
+  .map-room__tokens--all {
+  grid-template-columns: repeat(3, 44px);
+  grid-auto-rows: 44px;
+  gap: 7px;
+}
+
+.map-grid
+  .map-room.map-room--room-token-layout
+  .map-room__tokens
+  .character-token {
+  flex: none;
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.map-grid
+  .map-room.map-room--room-token-layout.map-room--token-wide
+  .map-room__tokens--all
+  .character-token {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  font-size: 0.62rem;
+}
+
+.map-grid
+  .map-room.map-room--auditorium-token-layout
+  .map-room__tokens
+  .character-token {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  font-size: 0.69rem;
+}
+
+.map-grid
+  .map-room.map-room--room-token-layout
+  .map-room__tokens
+  .character-token
+  .character-token__name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: inherit;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-grid .map-room.map-room--room-token-layout .map-room__tokens,
+.map-grid .map-room.map-room--room-token-layout .map-room__tokens * {
+  pointer-events: none;
+}
+
+/* 토큰이 있는 일반 방의 이름은 토큰 아래에서도 읽히도록 위 레이어 유지 */
+.map-grid
+  .map-room.map-room--room-token-layout:not(.map-room--auditorium-token-layout)
+  > .map-room__label {
+  position: relative;
+  z-index: 9;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: color-mix(
+    in srgb,
+    var(--room-color, var(--surface)) 86%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+body.theme-admin.theme-mode-dark
+  .map-grid
+  .map-room.map-room--auditorium-token-layout
+  > .map-room__label {
+  color: #f5f7f8;
+}
+
+body.theme-spirit.theme-mode-dark
+  .map-grid
+  .map-room.map-room--auditorium-token-layout
+  > .map-room__label {
+  color: #fff0f2;
+}
+
+body.theme-survivor.theme-mode-dark
+  .map-grid
+  .map-room.map-room--auditorium-token-layout
+  > .map-room__label {
+  color: #f0f6fc;
+}
+
+/* =========================================================
+   지도 토큰 과밀 표시 V4
+   - 한 공간에서 최대 6명
+   - 플레이어 본인 / 관리자 선택 캐릭터는 6명 안에 우선 포함
+   - 나머지는 +N명
+   - +N hover / focus / click 시 숨겨진 이름 목록 표시
+   ========================================================= */
+
+.map-token-overflow-wrap {
+  position: absolute;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.map-token-overflow {
+  display: inline-flex;
+  min-width: 48px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--navy-800) 52%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--navy-900);
+  box-shadow: 0 5px 14px rgba(12, 39, 68, 0.16);
+  font-size: 0.7rem;
+  font-weight: 950;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.map-token-overflow:hover,
+.map-token-overflow:focus-visible,
+.map-token-overflow-wrap.is-open .map-token-overflow {
+  border-color: var(--blue-500);
+  background: var(--surface-blue);
+  color: var(--navy-950);
+  outline: 0;
+}
+
+.map-token-overflow-list {
+  position: absolute;
+  z-index: 80;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  display: none;
+  width: max-content;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 10px 11px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 12px 30px rgba(12, 39, 68, 0.2);
+  text-align: left;
+  pointer-events: none;
+}
+
+.map-token-overflow-wrap:hover .map-token-overflow-list,
+.map-token-overflow-wrap:focus-within .map-token-overflow-list,
+.map-token-overflow-wrap.is-open .map-token-overflow-list {
+  display: block;
+}
+
+.map-token-overflow-list > strong {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: 0.69rem;
+  font-weight: 950;
+}
+
+.map-token-overflow-list__names {
+  display: grid;
+  gap: 4px;
+}
+
+.map-token-overflow-list__name {
+  display: block;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* 일반 방은 오른쪽 아래, 대강당은 하단 중앙 */
+.map-grid .map-room.map-room--room-token-layout > .map-token-overflow-wrap {
+  right: 5px;
+  bottom: 5px;
+}
+
+.map-grid
+  .map-room.map-room--auditorium-token-layout
+  > .map-token-overflow-wrap {
+  right: auto;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+}
+
+/* 방 DOM이 없는 특수 셀의 안전한 fallback */
+.map-cell:has(> .map-token-overflow-wrap) {
+  z-index: 30;
+  overflow: visible;
+}
+
+.map-cell > .map-token-overflow-wrap {
+  right: 3px;
+  bottom: 3px;
+}
+
+.map-cell > .map-token-overflow-wrap .map-token-overflow-list {
+  right: -4px;
+  left: auto;
+  transform: none;
+}
+
+/* 벙커 중앙 */
+.bunker-center-map__tokens {
+  position: relative;
+}
+
+.bunker-center-map__tokens > .map-token-overflow-wrap {
+  right: 0;
+  bottom: 0;
+}
+
+body.theme-admin.theme-mode-dark .map-token-overflow,
+body.theme-survivor.theme-mode-dark .map-token-overflow,
+body.theme-spirit.theme-mode-dark .map-token-overflow {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+body.theme-admin.theme-mode-dark .map-token-overflow-list,
+body.theme-survivor.theme-mode-dark .map-token-overflow-list,
+body.theme-spirit.theme-mode-dark .map-token-overflow-list {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .map-grid .map-room.map-room--auditorium-token-layout .map-room__tokens {
+    width: calc(100% - 20px);
+    grid-template-columns: repeat(auto-fit, 44px);
+    gap: 8px 9px;
+  }
+
+  .map-grid
+    .map-room.map-room--auditorium-token-layout
+    .map-room__tokens
+    .character-token {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    font-size: 0.62rem;
+  }
+
+  .map-grid .map-room.map-room--auditorium-token-layout > .map-room__label {
+    font-size: 0.86rem;
+  }
+
+  .map-token-overflow {
+    min-width: 42px;
+    min-height: 25px;
+    padding: 3px 7px;
+    font-size: 0.64rem;
+  }
+
+  .map-token-overflow-list {
+    min-width: 138px;
+    max-width: 190px;
+    padding: 8px 9px;
+  }
+}
+
+/* =========================================================
+   지도 공간별 토큰 표시 V5
+   - 모든 층/모든 roomId에 동일 적용
+   - 한 공간 최대 6명 + N명
+   - 지도 grid/방 비율은 변경하지 않음
+   - +N 목록은 지도 위를 덮지 않고 버튼 옆의 고정 팝업으로 표시
+   ========================================================= */
+
+/*
+ * 토큰은 실제 방 DOM 안이 아니라 map-grid 위의 별도 레이어에 표시합니다.
+ * 따라서 방 자체의 grid-column / grid-row / 폭 / 높이는 전혀 바뀌지 않습니다.
+ */
+.map-room-token-zone {
+  position: relative;
+  z-index: 32;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.map-room-token-zone__tokens {
+  position: absolute;
+  z-index: 33;
+  inset: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 38px);
+  grid-auto-rows: 38px;
+  place-content: center;
+  gap: 5px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.map-room-token-zone.is-wide .map-room-token-zone__tokens {
+  grid-template-columns: repeat(3, 44px);
+  grid-auto-rows: 44px;
+  gap: 7px;
+}
+
+.map-room-token-zone__tokens .character-token {
+  flex: none;
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.map-room-token-zone.is-wide .map-room-token-zone__tokens .character-token {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  font-size: 0.62rem;
+}
+
+.map-room-token-zone__tokens .character-token__name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: inherit;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 대강당: 방 이름은 정중앙, 최대 6개 토큰은 이름 위/아래로 나눔 */
+.map-room-token-zone.is-auditorium .map-room-token-zone__tokens {
+  left: 50%;
+  right: auto;
+  width: min(calc(100% - 30px), 420px);
+  transform: translateX(-50%);
+  grid-template-columns: repeat(3, 52px);
+  grid-auto-rows: 52px;
+  justify-content: center;
+  align-content: center;
+  gap: 9px 12px;
+}
+
+.map-room-token-zone.is-auditorium .map-room-token-zone__tokens--upper {
+  top: 7%;
+  bottom: 58%;
+}
+
+.map-room-token-zone.is-auditorium .map-room-token-zone__tokens--lower {
+  top: 59%;
+  bottom: 7%;
+}
+
+.map-room-token-zone.is-auditorium
+  .map-room-token-zone__tokens
+  .character-token {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  font-size: 0.69rem;
+}
+
+/* 대강당 이름은 기존 지도 방의 정중앙에 고정 */
+.map-grid .map-room.map-room--auditorium-token-layout > .map-room__label {
+  position: absolute;
+  z-index: 36;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  width: max-content;
+  max-width: 80%;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   +N명: 모든 일반 층/방과 벙커 중앙에 동일 적용
+   --------------------------------------------------------- */
+.map-room-token-zone > .map-token-overflow-wrap {
+  position: absolute;
+  z-index: 45;
+  top: 50%;
+  right: 6px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.map-room-token-zone.is-auditorium > .map-token-overflow-wrap {
+  top: 50%;
+  right: 10px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+}
+
+/*
+ * 목록은 버튼 위가 아니라 버튼의 좌/우 옆에 position: fixed로 표시됩니다.
+ * 실제 방향과 화면 안쪽 위치는 JS가 viewport를 보고 계산합니다.
+ */
+.map-token-overflow-list,
+.map-cell > .map-token-overflow-wrap .map-token-overflow-list {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  left: 0;
+  display: none;
+  width: max-content;
+  min-width: 160px;
+  max-width: min(260px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 16px));
+  padding: 10px 11px;
+  transform: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 12px 30px rgba(12, 39, 68, 0.2);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.map-token-overflow-wrap.is-positioning .map-token-overflow-list {
+  display: block;
+  visibility: hidden;
+}
+
+.map-token-overflow-wrap:hover .map-token-overflow-list,
+.map-token-overflow-wrap:focus-within .map-token-overflow-list,
+.map-token-overflow-wrap.is-open .map-token-overflow-list {
+  display: block;
+  visibility: visible;
+}
+
+.map-token-overflow-list__names {
+  display: grid;
+  gap: 4px;
+}
+
+.map-token-overflow-list__name {
+  display: block;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* 기존 셀별 +N 위치 규칙은 특수 fallback에서만 사용 */
+.map-cell > .map-token-overflow-wrap {
+  z-index: 45;
+}
+
+/* 벙커 중앙도 최대 6명 + N명 규칙과 같은 팝업 사용 */
+.bunker-center-map__tokens > .map-token-overflow-wrap {
+  z-index: 45;
+}
+
+@media (max-width: 900px) {
+  .map-room-token-zone.is-auditorium .map-room-token-zone__tokens {
+    width: calc(100% - 20px);
+    grid-template-columns: repeat(3, 44px);
+    grid-auto-rows: 44px;
+    gap: 8px 9px;
+  }
+
+  .map-room-token-zone.is-auditorium
+    .map-room-token-zone__tokens
+    .character-token {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    font-size: 0.62rem;
+  }
+
+  .map-room-token-zone > .map-token-overflow-wrap,
+  .map-room-token-zone.is-auditorium > .map-token-overflow-wrap {
+    right: 4px;
+  }
+}
+
+/* =========================================================
+   지도 +N명 배지/명단 팝업 V6
+   - +N 배지는 토큰 묶음 바로 옆에 표시
+   - 명단은 body 포털로 띄워 지도/토큰/상단에 가려지지 않음
+   - 모든 roomId / 모든 지도 / 모든 계정 공통
+   ========================================================= */
+
+/* 기존 내부 명단 팝업은 데이터 소스로만 사용하고 화면에는 직접 띄우지 않음 */
+.map-room-token-zone .map-token-overflow-list,
+.map-cell .map-token-overflow-list,
+.bunker-center-map__tokens .map-token-overflow-list,
+.map-token-overflow-wrap:hover .map-token-overflow-list,
+.map-token-overflow-wrap:focus-within .map-token-overflow-list,
+.map-token-overflow-wrap.is-open .map-token-overflow-list {
+  display: none;
+}
+
+/* +N명은 방 우측 끝이 아니라 현재 보이는 토큰 묶음 바로 옆 */
+.map-room-token-zone > .map-token-overflow-wrap {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: calc(50% + 54px);
+  transform: translateY(-50%);
+}
+
+.map-room-token-zone.is-wide > .map-token-overflow-wrap {
+  left: calc(50% + 84px);
+}
+
+.map-room-token-zone.is-auditorium > .map-token-overflow-wrap {
+  top: 72%;
+  right: auto;
+  left: calc(50% + 108px);
+  transform: translate(-50%, -50%);
+}
+
+/* 실제 명단은 document.body 바로 아래에 생성됨 */
+.map-token-overflow-portal {
+  position: fixed;
+  z-index: 30000;
+  display: none;
+  width: max-content;
+  min-width: 160px;
+  max-width: min(270px, calc(100vw - 20px));
+  max-height: min(360px, calc(100vh - 20px));
+  padding: 10px 11px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 12px 30px rgba(12, 39, 68, 0.22);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.map-token-overflow-portal.is-visible {
+  display: block;
+}
+
+.map-token-overflow-portal > strong {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: 0.69rem;
+  font-weight: 950;
+}
+
+.map-token-overflow-portal .map-token-overflow-list__names {
+  display: grid;
+  gap: 4px;
+}
+
+.map-token-overflow-portal .map-token-overflow-list__name {
+  display: block;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+body.theme-admin.theme-mode-dark .map-token-overflow-portal,
+body.theme-survivor.theme-mode-dark .map-token-overflow-portal,
+body.theme-spirit.theme-mode-dark .map-token-overflow-portal {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .map-room-token-zone > .map-token-overflow-wrap {
+    left: calc(50% + 49px);
+  }
+
+  .map-room-token-zone.is-wide > .map-token-overflow-wrap {
+    left: calc(50% + 76px);
+  }
+
+  .map-room-token-zone.is-auditorium > .map-token-overflow-wrap {
+    left: calc(50% + 93px);
+  }
+}
+
+/* =========================================================
+   지도 +N명 배지 위치 V7
+   - 배지는 방 가장자리가 아니라 실제 6번째 토큰 바로 옆에 배치
+   - 정확한 위치는 JS가 실제 토큰 크기를 측정해서 지정
+   - 지도/방 크기 및 비율은 변경하지 않음
+   ========================================================= */
+.map-room-token-zone > .map-token-overflow-wrap {
+  top: 0;
+  right: auto;
+  bottom: auto;
+  left: 0;
+  transform: none;
+  opacity: 0;
+}
+
+.map-room-token-zone > .map-token-overflow-wrap.is-badge-positioned {
+  opacity: 1;
+}
+
+/* V6의 대강당/넓은 방 고정 위치값을 사용하지 않는다. */
+.map-room-token-zone.is-wide > .map-token-overflow-wrap,
+.map-room-token-zone.is-auditorium > .map-token-overflow-wrap {
+  right: auto;
+  bottom: auto;
+  transform: none;
+}
+
+/* 팝업은 토큰보다 위에 뜨되 실제 위치는 JS가 토큰 겹침을 검사해 좌/우 선택 */
+.map-token-overflow-portal {
+  pointer-events: auto;
+}
+
+/* =========================================================
+   대강당 이름 최종 중앙 고정
+   - 토큰/공간 크기와 무관하게 방 전체의 정확한 중앙
+   - 기존 지도 비율과 방 크기는 변경하지 않음
+   ========================================================= */
+.map-grid .map-room[data-room-id="auditorium"] {
+  position: relative;
+}
+
+.map-grid .map-room[data-room-id="auditorium"] > .map-room__label {
+  position: absolute;
+  z-index: 40;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  display: block;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--navy-900);
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+body.theme-admin.theme-mode-dark
+  .map-grid
+  .map-room[data-room-id="auditorium"]
+  > .map-room__label {
+  color: #f5f7f8;
+}
+
+body.theme-spirit.theme-mode-dark
+  .map-grid
+  .map-room[data-room-id="auditorium"]
+  > .map-room__label {
+  color: #fff0f2;
+}
+
+body.theme-survivor.theme-mode-dark
+  .map-grid
+  .map-room[data-room-id="auditorium"]
+  > .map-room__label {
+  color: #f0f6fc;
+}
+
+/* =========================================================
+   관리자 지도 토큰 / +N명 명단 클릭 보정
+   - 일반 플레이어 화면 동작은 변경하지 않음
+   - 관리자 지도에서 모든 캐릭터 토큰을 확실하게 클릭 가능
+   - +N명 팝업의 이름 버튼도 캐릭터 관리창 진입용으로 사용
+   ========================================================= */
+
+/*
+ * roomId 공통 토큰 레이어는 레이아웃 충돌 방지를 위해 pointer-events:none을
+ * 유지하지만, 관리자 화면의 실제 캐릭터 토큰만 다시 클릭 가능하게 엽니다.
+ */
+body.theme-admin .map-grid .map-room-token-zone__tokens .character-token,
+body.theme-admin .map-grid .bunker-center-map__tokens .character-token,
+body.theme-admin .map-grid [data-token-character] {
+  position: relative;
+  z-index: 60;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+body.theme-admin .map-grid [data-token-character]:hover {
+  filter: brightness(1.06);
+}
+
+/* +N명 포털 안 관리자용 캐릭터 이름 버튼 */
+.map-token-overflow-portal .map-token-overflow-list__name--admin {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.map-token-overflow-portal .map-token-overflow-list__name--admin:hover,
+.map-token-overflow-portal .map-token-overflow-list__name--admin:focus-visible {
+  background: var(--surface-blue);
+  outline: none;
+}
