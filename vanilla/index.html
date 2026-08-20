@@ -4,16 +4,73 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0c2744" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>생환대학교 부설 학술원 조사 시스템</title>
-    <link rel="stylesheet" href="./css/01-foundation.css" />
-    <link rel="stylesheet" href="./css/02-app-shell.css" />
-    <link rel="stylesheet" href="./css/03-map-and-teams.css" />
-    <link rel="stylesheet" href="./css/04-spirit-theme.css" />
-    <link rel="stylesheet" href="./css/05-admin-operations.css" />
-    <link rel="stylesheet" href="./css/06-feature-overrides.css" />
+
+    <link
+      rel="stylesheet"
+      href="./css/01-foundation.css?v=20260818-2310-vanilla-preview"
+    />
+    <link
+      rel="stylesheet"
+      href="./css/02-app-shell.css?v=20260818-2310-vanilla-preview"
+    />
+    <link
+      rel="stylesheet"
+      href="./css/03-map-and-teams.css?v=20260818-2310-vanilla-preview"
+    />
+    <link
+      rel="stylesheet"
+      href="./css/04-spirit-theme.css?v=20260818-2310-vanilla-preview"
+    />
+    <link
+      rel="stylesheet"
+      href="./css/05-admin-operations.css?v=20260818-2310-vanilla-preview"
+    />
+    <link
+      rel="stylesheet"
+      href="./css/06-feature-overrides.css?v=20260820-1535-login-spacing"
+    />
+
+    <script>
+      (() => {
+        const isLocalPreview =
+          location.protocol === "file:" ||
+          location.hostname === "localhost" ||
+          location.hostname === "127.0.0.1";
+
+        if (!isLocalPreview) return;
+
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then((registrations) =>
+              Promise.all(
+                registrations.map((registration) => registration.unregister()),
+              ),
+            )
+            .catch(() => {});
+        }
+
+        if ("caches" in window) {
+          caches
+            .keys()
+            .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+            .catch(() => {});
+        }
+      })();
+    </script>
   </head>
-  <body>
-    <noscript>로딩중. 너무 장시간 로딩이 안될시 새로고침을 해주세요.</noscript>
+
+  <body class="login-theme app-booting">
+    <noscript>
+      로딩중. 너무 장시간 로딩이 안될시 새로고침을 해주세요.
+    </noscript>
 
     <section
       id="loginView"
@@ -23,6 +80,7 @@
       <div class="login-card login-card--search">
         <div class="brand brand--login">
           <div class="brand__seal" aria-hidden="true">SHU</div>
+
           <div>
             <p class="eyebrow">SAENGHWAN UNIVERSITY INSTITUTE</p>
             <h1 id="loginTitle">학술원 조사 시스템</h1>
@@ -30,7 +88,8 @@
         </div>
 
         <form id="characterLoginForm" class="login-form login-form--search">
-          <label for="accessPasswordInput">접속 비밀번호</label>
+          <label for="accessPasswordInput"> 접속 비밀번호 </label>
+
           <div class="login-form__row">
             <input
               id="accessPasswordInput"
@@ -41,9 +100,14 @@
               placeholder="지정받은 비밀번호를 입력하세요"
               required
             />
-            <button type="submit" class="button button--primary">접속</button>
+
+            <button type="submit" class="button button--primary">확인</button>
           </div>
-          <p class="login-security-note">비밀번호는 서버에서 확인되며 캐릭터 번호·이메일 입력은 필요하지 않습니다.</p>
+
+          <p class="login-security-note">
+            비밀번호를 확인한 뒤 표시된 계정을 선택해 접속합니다.
+          </p>
+
           <p id="loginError" class="form-message" role="alert"></p>
         </form>
 
@@ -59,10 +123,13 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand__seal" aria-hidden="true">SHU</div>
+
           <!-- 여기에 로고 넣어야함 -->
+
           <div class="brand__copy">
-            <strong>생환대학교 부설 학술원 조사 시스템</strong>
-            <span>공간 이동 · 팀 위치 공유 · 조사 기록</span>
+            <strong> 생환대학교 부설 학술원 조사 시스템 </strong>
+
+            <span> 공간 이동 · 팀 위치 공유 · 조사 기록 </span>
           </div>
         </div>
 
@@ -75,10 +142,13 @@
           >
             관리 페이지
           </button>
-          <button id="eventButton" type="button" class="event-button">
-            <span aria-hidden="true">!</span> 긴급 이벤트 0건
-          </button>
+
           <div id="sessionBadge" class="session-badge"></div>
+
+          <button id="eventButton" type="button" class="event-button">
+            <span aria-hidden="true">!</span>
+            긴급 이벤트 0건
+          </button>
         </div>
 
         <div class="topbar__actions">
@@ -93,9 +163,10 @@
             <span class="theme-toggle__track" aria-hidden="true">
               <span class="theme-toggle__thumb"></span>
             </span>
-            <span id="themeToggleLabel" class="theme-toggle__label"
-              >라이트</span
-            >
+
+            <span id="themeToggleLabel" class="theme-toggle__label">
+              라이트
+            </span>
           </button>
 
           <button
@@ -122,11 +193,13 @@
                 aria-label="관리자 시점 전환"
               >
                 <button type="button" data-view-mode="survivor">
-                  생환자 시점
+                  생존자 시점
                 </button>
+
                 <button type="button" data-view-mode="spirit">
-                  빙혼자 시점
+                  동결체 시점
                 </button>
+
                 <button type="button" data-view-mode="admin" class="is-active">
                   관리자 시점
                 </button>
@@ -136,8 +209,10 @@
             <div class="map-detail-bar">
               <div class="map-panel__title">
                 <p id="mapEyebrow" class="eyebrow">학술원 부지 지도</p>
+
                 <h2 id="mapTitle">
-                  융합학술동 <span id="currentFloorLabel">1F</span>
+                  융합학술동
+                  <span id="currentFloorLabel"> 1F </span>
                 </h2>
               </div>
 
@@ -175,6 +250,7 @@
               role="grid"
               aria-label="공간 단위 지도"
             ></div>
+
             <div id="mapToast" class="map-toast is-hidden" role="status"></div>
           </div>
 
@@ -183,19 +259,26 @@
               id="selectedCharacterSummary"
               class="selected-summary"
             ></article>
+
             <div class="map-legend" aria-label="지도 범례">
-              <span
-                ><i class="legend-box legend-box--visible"></i>현재 위치한
-                공간</span
-              >
-              <span
-                ><i class="legend-dot legend-dot--blue"></i>같은 공간 · 표시
-                그룹</span
-              >
-              <span><i class="legend-box legend-box--danger"></i>위험구역</span>
+              <span>
+                <i class="legend-box legend-box--visible"></i>
+                현재 위치한 공간
+              </span>
+
+              <span>
+                <i class="legend-dot legend-dot--blue"></i>
+                같은 공간 · 표시 그룹
+              </span>
+
+              <span>
+                <i class="legend-box legend-box--danger"></i>
+                위험구역
+              </span>
             </div>
+
             <p id="movementRule" class="movement-rule">
-              빙혼자 · 공간 변경 1회 = 행동력 1
+              동결체 · 공간 변경 1회 = 행동력 1
             </p>
           </div>
         </section>
@@ -227,9 +310,12 @@
         <header class="campus-map-popup__header">
           <div>
             <p class="eyebrow">CAMPUS MAP</p>
+
             <h2 id="campusMapPopupTitle">학술원 전체 지도</h2>
+
             <p>건물을 선택하면 해당 건물의 층별 상세 지도로 이동합니다.</p>
           </div>
+
           <button
             id="campusMapCloseButton"
             type="button"
@@ -261,8 +347,10 @@
         <header class="modal__header">
           <div>
             <p id="modalEyebrow" class="eyebrow"></p>
+
             <h2 id="modalTitle"></h2>
           </div>
+
           <button
             id="modalCloseButton"
             type="button"
@@ -272,7 +360,9 @@
             ×
           </button>
         </header>
+
         <div id="modalBody" class="modal__body"></div>
+
         <footer id="modalFooter" class="modal__footer"></footer>
       </section>
     </div>
@@ -280,11 +370,20 @@
     <template id="emptyStateTemplate">
       <div class="empty-state">
         <span aria-hidden="true">◇</span>
+
         <p>표시할 기록이 없습니다.</p>
       </div>
     </template>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./js/supabase-config.js"></script>
-    <script src="./js/app.js" defer></script>
+
+    <script
+      src="./js/supabase-config.js"
+      onerror="
+        console.info('Local preview mode: supabase-config.js not loaded.')
+      "
+    ></script>
+
+    <script src="./js/app.js?v=20260820-1535-login-spacing" defer></script>
   </body>
 </html>

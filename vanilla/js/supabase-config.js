@@ -1,17 +1,6 @@
 (() => {
   "use strict";
 
-  /*
-   * 브라우저에 공개되어도 되는 값만 이 파일에 넣습니다.
-   * - Project URL
-   * - sb_publishable_... 키
-   *
-   * 절대 넣지 말 것:
-   * - sb_secret_...
-   * - service_role
-   * - 학생 학번/비밀번호 원문
-   * - 관리자 비밀번호 원문
-   */
   const SUPABASE_URL = "https://iyxcaeoksphgwvifdxdr.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_Jy42YpJiBPonjxA_sKzm_A___B3faYN";
@@ -29,7 +18,7 @@
 
   if (!configured) {
     console.warn(
-      "Supabase 연결값이 아직 설정되지 않았습니다. vanilla/js/supabase-config.js를 확인하세요.",
+      "Supabase 연결값이 아직 설정되지 않았습니다. js/supabase-config.js를 확인하세요.",
     );
     return;
   }
