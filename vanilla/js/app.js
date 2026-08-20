@@ -2360,15 +2360,11 @@
     if (Number(character.id) === Number(viewer.id)) return true;
 
     /*
-     * 생환자는 동결체를 볼 수 없지만, 동결체는 같은 공간의 생환자를 볼 수 있습니다.
-     * 기존 코드는 역할이 다르면 양쪽 모두 숨겨서 동결체 화면에서도 생환자가
-     * 사라지는 문제가 있었습니다.
+     * 플레이어 지도에서는 서로 다른 역할의 캐릭터 신원을 공개하지 않습니다.
+     * 생환자는 동결체를 볼 수 없고, 동결체도 생환자를 볼 수 없습니다.
+     * 동결체는 같은 공간에 생환자가 있는지 여부만 '온기' 신호로 전달받습니다.
      */
-    if (viewer.role === "survivor" && character.role === "spirit") {
-      return false;
-    }
-
-    return true;
+    return character.role === viewer.role;
   }
 
   function getVisibleCharactersAtCell(floorId, x, y, perspective, visible) {
@@ -2486,8 +2482,10 @@
       session?.type === "player" &&
       Number(state?._viewerSignals?.characterId) === Number(character.id)
     ) {
-      const count = Number(state._viewerSignals.warmthCount || 0);
-      return { active: count > 0, count, roomId };
+      const detected =
+        state._viewerSignals.warmthDetected === true ||
+        Number(state._viewerSignals.warmthCount || 0) > 0;
+      return { active: detected, count: 0, roomId };
     }
 
     const survivors = state.characters.filter(
@@ -2496,7 +2494,7 @@
         candidate.floor === character.floor &&
         getRoomId(candidate.floor, candidate.x, candidate.y) === roomId,
     );
-    return { active: survivors.length > 0, count: survivors.length, roomId };
+    return { active: survivors.length > 0, count: 0, roomId };
   }
 
   function showResetConfirmation() {
@@ -4560,7 +4558,7 @@
     const show = perspective.mode === "spirit" && warmth.active;
     elements.warmthBanner.classList.toggle("is-hidden", !show);
     if (show)
-      elements.warmthBanner.innerHTML = `<span class="warmth-anonymous">온기가 느껴집니다.</span> 이 공간에 생존자가 ${warmth.count}명 있습니다. 누구인지는 알 수 없습니다.`;
+      elements.warmthBanner.innerHTML = `<span class="warmth-anonymous">온기가 느껴집니다.</span>`;
   }
 
   function recordSpiritMovement(
