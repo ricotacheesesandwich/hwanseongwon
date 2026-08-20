@@ -128,12 +128,9 @@ async function getGameRow(): Promise<GameRow | null> {
 }
 
 async function emitVersion(version: number) {
-  const { error } = await admin
-    .from("game_state_events")
-    .insert({ version });
+  const { error } = await admin.from("game_state_events").insert({ version });
   if (error) throw error;
 
-  // 이벤트 테이블이 무한정 커지지 않게 최근 500개 정도만 유지합니다.
   const threshold = Math.max(0, version - 500);
   if (threshold > 0) {
     await admin.from("game_state_events").delete().lt("version", threshold);
@@ -183,6 +180,214 @@ function cellKey(x: number, y: number) {
 
 function floorRoom(rules: any, floorId: string, x: number, y: number) {
   return rules?.floors?.[floorId]?.cells?.[cellKey(x, y)] || null;
+}
+
+function buildingFromFloorKey(floorId: string): string {
+  const key = String(floorId || "");
+  if (key.startsWith("research:")) return "research";
+  if (key.startsWith("living:")) return "living";
+  if (key.startsWith("support:")) return "support";
+  if (key.startsWith("bunker:")) return "bunker";
+  return "main";
+}
+
+function fallbackBuildingArrival(buildingId: string) {
+  const defaults: Record<string, { floor: string; x: number; y: number }> = {
+    main: { floor: "1F", x: 5, y: 4 },
+    living: { floor: "living:1F", x: 5, y: 4 },
+    research: { floor: "research:1F", x: 5, y: 4 },
+    support: { floor: "support:1F", x: 5, y: 4 },
+  };
+  return defaults[buildingId] || null;
+}
+
+const BUNKER_DESCENT_COST = 2;
+const BUNKER_TRANSFER_COST = 3;
+const BUNKER_CENTER_FLOOR = "bunker:center";
+const BUNKER_CENTER_ENTRY_ROOM = "bunker_a_center_entry";
+const BUNKER_CENTER_POSITION = { x: 5, y: 4 };
+const BUNKER_CENTER_RETURN_POSITION = { x: 6, y: 6 };
+
+const BUNKER_ACCESS_POINTS: Record<string, string[]> = {
+  "B1:document_archive": ["bunker:A", "bunker:B"],
+  "support:1F:support_hvac": ["bunker:C"],
+  "living:B1:living_b1_cleaning": ["bunker:B"],
+  "research:1F:research_1f_sample": ["bunker:A"],
+};
+
+const BUNKER_DESCENT_ARRIVAL_POINTS: Record<string, { x: number; y: number }> =
+  {
+    "B1:document_archive:bunker:A": { x: 1, y: 6 },
+    "B1:document_archive:bunker:B": { x: 1, y: 6 },
+    "research:1F:research_1f_sample:bunker:A": { x: 10, y: 0 },
+    "living:B1:living_b1_cleaning:bunker:B": { x: 10, y: 0 },
+    "support:1F:support_hvac:bunker:C": { x: 10, y: 0 },
+  };
+
+const BUNKER_SURFACE_EXITS: Record<
+  string,
+  { floor: string; x: number; y: number }
+> = {
+  "bunker:A:bunker_a_security_stairs": {
+    floor: "research:1F",
+    x: 1,
+    y: 6,
+  },
+  "bunker:A:bunker_a_emergency_stairs": {
+    floor: "B1",
+    x: 4,
+    y: 0,
+  },
+  "bunker:B:bunker_b_security_stairs": {
+    floor: "living:B1",
+    x: 8,
+    y: 6,
+  },
+  "bunker:B:bunker_b_emergency_stairs": {
+    floor: "B1",
+    x: 4,
+    y: 0,
+  },
+  "bunker:C:bunker_c_security_stairs": {
+    floor: "support:1F",
+    x: 8,
+    y: 6,
+  },
+  "bunker:C:bunker_c_emergency_stairs": {
+    floor: "support:1F",
+    x: 8,
+    y: 6,
+  },
+};
+
+const BUNKER_TRANSFER_ROOMS: Record<
+  string,
+  { targetFloor: string; targetX: number; targetY: number }
+> = {
+  "bunker:A:bunker_a_transfer_b": {
+    targetFloor: "bunker:B",
+    targetX: 0,
+    targetY: 3,
+  },
+  "bunker:A:bunker_a_transfer_c": {
+    targetFloor: "bunker:C",
+    targetX: 11,
+    targetY: 3,
+  },
+  "bunker:B:bunker_b_transfer_a": {
+    targetFloor: "bunker:A",
+    targetX: 0,
+    targetY: 3,
+  },
+  "bunker:B:bunker_b_transfer_c": {
+    targetFloor: "bunker:C",
+    targetX: 0,
+    targetY: 3,
+  },
+  "bunker:C:bunker_c_transfer_b": {
+    targetFloor: "bunker:B",
+    targetX: 11,
+    targetY: 3,
+  },
+  "bunker:C:bunker_c_transfer_a": {
+    targetFloor: "bunker:A",
+    targetX: 11,
+    targetY: 3,
+  },
+};
+
+type SpecialBunkerMove = {
+  targetX: number;
+  targetY: number;
+  cost: number;
+  source: string;
+};
+
+function resolveSpecialBunkerMove(
+  state: any,
+  rules: any,
+  character: any,
+  targetFloor: string,
+): SpecialBunkerMove | null {
+  const fromFloor = String(character.floor || "");
+  const fromCell = floorRoom(
+    rules,
+    fromFloor,
+    Number(character.x),
+    Number(character.y),
+  );
+  const fromRoomId = String(fromCell?.roomId || "");
+
+  // 지상 → 지하벙커 진입
+  const descentTargets =
+    BUNKER_ACCESS_POINTS[`${fromFloor}:${fromRoomId}`] || [];
+  if (
+    state?.bunkerAccessByRole?.spirit === true &&
+    descentTargets.includes(targetFloor)
+  ) {
+    const arrival =
+      BUNKER_DESCENT_ARRIVAL_POINTS[
+        `${fromFloor}:${fromRoomId}:${targetFloor}`
+      ];
+    if (!arrival) return null;
+    return {
+      targetX: arrival.x,
+      targetY: arrival.y,
+      cost: BUNKER_DESCENT_COST,
+      source: "지하벙커 이동",
+    };
+  }
+
+  // 지하벙커 A/B/C → 지상 복귀
+  const surfaceExit = BUNKER_SURFACE_EXITS[`${fromFloor}:${fromRoomId}`];
+  if (surfaceExit && surfaceExit.floor === targetFloor) {
+    return {
+      targetX: surfaceExit.x,
+      targetY: surfaceExit.y,
+      cost: 0,
+      source: "벙커 계단",
+    };
+  }
+
+  // 지하벙커 A/B/C 이동문
+  const transfer = BUNKER_TRANSFER_ROOMS[`${fromFloor}:${fromRoomId}`];
+  if (transfer && transfer.targetFloor === targetFloor) {
+    return {
+      targetX: transfer.targetX,
+      targetY: transfer.targetY,
+      cost: BUNKER_TRANSFER_COST,
+      source: "벙커 이동문",
+    };
+  }
+
+  // A 구역 ↔ 중앙 구역
+  if (
+    fromFloor === "bunker:A" &&
+    fromRoomId === BUNKER_CENTER_ENTRY_ROOM &&
+    targetFloor === BUNKER_CENTER_FLOOR
+  ) {
+    return {
+      targetX: BUNKER_CENTER_POSITION.x,
+      targetY: BUNKER_CENTER_POSITION.y,
+      cost: 0,
+      source: "벙커 중앙 출입입구",
+    };
+  }
+
+  if (fromFloor === BUNKER_CENTER_FLOOR && targetFloor === "bunker:A") {
+    return {
+      targetX: BUNKER_CENTER_RETURN_POSITION.x,
+      targetY: BUNKER_CENTER_RETURN_POSITION.y,
+      cost: 0,
+      source: "벙커 중앙 출입입구",
+    };
+  }
+
+  return null;
+}
+
+function involvesBunkerFloor(fromFloor: string, targetFloor: string) {
+  return fromFloor.startsWith("bunker:") || targetFloor.startsWith("bunker:");
 }
 
 function canStep(
@@ -416,7 +621,7 @@ function stateForAccount(
 
   const viewerRoom = roomIdAt(rules, viewer);
   const ownTeams = (sourceState.teams || []).filter((team: any) =>
-    (team.memberIds || []).map(Number).includes(characterId)
+    (team.memberIds || []).map(Number).includes(characterId),
   );
   const sharedIds = new Set<number>([characterId]);
 
@@ -432,11 +637,14 @@ function stateForAccount(
     }
   }
 
+  // 같은 공간은 roomId 단위로 인식합니다.
+  // 동결체는 같은 공간의 생환자를 볼 수 있지만,
+  // 생환자는 기존 규칙대로 동결체 정보를 받지 않습니다.
   for (const candidate of sourceState.characters || []) {
-    if (candidate.role !== viewer.role || candidate.floor !== viewer.floor) continue;
-    if (viewerRoom && roomIdAt(rules, candidate) === viewerRoom) {
-      sharedIds.add(Number(candidate.id));
-    }
+    if (candidate.floor !== viewer.floor) continue;
+    if (!viewerRoom || roomIdAt(rules, candidate) !== viewerRoom) continue;
+    if (viewer.role === "survivor" && candidate.role !== "survivor") continue;
+    sharedIds.add(Number(candidate.id));
   }
 
   const visibleCharacters = (sourceState.characters || [])
@@ -444,10 +652,12 @@ function stateForAccount(
     .map((item: any) =>
       Number(item.id) === characterId
         ? clone(item)
-        : publicCharacterSnapshot(item)
+        : publicCharacterSnapshot(item),
     );
 
-  const visibleIds = new Set(visibleCharacters.map((item: any) => Number(item.id)));
+  const visibleIds = new Set(
+    visibleCharacters.map((item: any) => Number(item.id)),
+  );
   const teams = ownTeams.map((team: any) => ({
     ...clone(team),
     memberIds: (team.memberIds || [])
@@ -467,7 +677,11 @@ function stateForAccount(
     ? `${viewer.floor}::${viewerRoom}`
     : null;
   const spaceBurning = currentBurningKey
-    ? { [currentBurningKey]: Number(sourceState.spaceBurning?.[currentBurningKey] || 0) }
+    ? {
+        [currentBurningKey]: Number(
+          sourceState.spaceBurning?.[currentBurningKey] || 0,
+        ),
+      }
     : {};
 
   const exposure = sourceState.exposure?.[viewer.role]
@@ -495,7 +709,8 @@ function stateForAccount(
     _viewerSignals: {
       characterId,
       warmthCount: viewer.role === "spirit" ? sameRoomOpposite.length : 0,
-      coldContactCount: viewer.role === "survivor" ? sameRoomOpposite.length : 0,
+      coldContactCount:
+        viewer.role === "survivor" ? sameRoomOpposite.length : 0,
     },
   };
 }
@@ -564,7 +779,11 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!checkOrigin(req)) {
-    return json({ message: "허용되지 않은 사이트에서 온 요청입니다." }, 403, origin);
+    return json(
+      { message: "허용되지 않은 사이트에서 온 요청입니다." },
+      403,
+      origin,
+    );
   }
 
   try {
@@ -623,7 +842,11 @@ Deno.serve(async (req: Request) => {
       const path = String(body.path || "");
       const size = Number(body.size || 0);
       if (!isSafeMediaPath(path) || !(size >= 0) || size > 100 * 1024 * 1024) {
-        return json({ message: "업로드 파일 정보가 올바르지 않습니다." }, 400, origin);
+        return json(
+          { message: "업로드 파일 정보가 올바르지 않습니다." },
+          400,
+          origin,
+        );
       }
       const { data, error } = await admin.storage
         .from("game-media")
@@ -645,7 +868,9 @@ Deno.serve(async (req: Request) => {
         return json({ message: "파일 경로가 올바르지 않습니다." }, 400, origin);
       }
       const game = await getGameRow();
-      if (!game) return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
 
       const allowed =
         account.account_type === "admin" ||
@@ -679,7 +904,11 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!body.initialState || !body.mapRules?.floors) {
-        return json({ message: "초기 게임 데이터가 올바르지 않습니다." }, 400, origin);
+        return json(
+          { message: "초기 게임 데이터가 올바르지 않습니다." },
+          400,
+          origin,
+        );
       }
 
       const { data, error } = await admin
@@ -704,7 +933,9 @@ Deno.serve(async (req: Request) => {
       }
 
       const game = await getGameRow();
-      if (!game) return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
 
       const expectedVersion = Number(body.expectedVersion || 0);
       if (expectedVersion !== game.version) {
@@ -715,9 +946,11 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      const nextMapRules = body.mapRules?.floors ? body.mapRules : undefined;
       const nextVersion = await updateGameRow(
         game.version,
         body.state,
+        nextMapRules,
       );
       if (!nextVersion) {
         return json(
@@ -729,13 +962,45 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, version: nextVersion }, 200, origin);
     }
 
+    if (action === "sync-map-rules") {
+      if (account.account_type !== "admin") {
+        return json({ message: "관리자 권한이 필요합니다." }, 403, origin);
+      }
+
+      if (!body.mapRules?.floors) {
+        return json({ message: "지도 규칙이 올바르지 않습니다." }, 400, origin);
+      }
+
+      const game = await getGameRow();
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
+
+      const nextVersion = await updateGameRow(
+        game.version,
+        game.state,
+        body.mapRules,
+      );
+      if (!nextVersion) {
+        return json(
+          { message: "다른 사용자의 변경이 먼저 반영되었습니다." },
+          409,
+          origin,
+        );
+      }
+
+      return json({ ok: true, version: nextVersion }, 200, origin);
+    }
+
     if (action === "save-player-state") {
       if (account.account_type !== "player" || !account.character_id) {
         return json({ message: "플레이어 권한이 필요합니다." }, 403, origin);
       }
 
       const game = await getGameRow();
-      if (!game) return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
       const current = clone(game.state);
       const proposed = body.state || {};
       const characterId = Number(account.character_id);
@@ -787,7 +1052,9 @@ Deno.serve(async (req: Request) => {
       }
 
       const game = await getGameRow();
-      if (!game) return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
 
       const next = clone(game.state);
       const rules = game.map_rules;
@@ -795,12 +1062,9 @@ Deno.serve(async (req: Request) => {
         (item: any) => Number(item.id) === Number(account.character_id),
       );
       if (!character || character.role !== "spirit") {
-        return json({ message: "동결체만 직접 이동할 수 있습니다." }, 403, origin);
-      }
-      if ((character.statuses || []).includes("immobilized")) {
         return json(
-          { message: "행동불능 상태입니다.", code: "INVALID_MOVE" },
-          400,
+          { message: "동결체만 직접 이동할 수 있습니다." },
+          403,
           origin,
         );
       }
@@ -825,7 +1089,10 @@ Deno.serve(async (req: Request) => {
       );
       if (!fromCell) {
         return json(
-          { message: "현재 위치 정보가 올바르지 않습니다.", code: "INVALID_MOVE" },
+          {
+            message: "현재 위치 정보가 올바르지 않습니다.",
+            code: "INVALID_MOVE",
+          },
           400,
           origin,
         );
@@ -841,7 +1108,10 @@ Deno.serve(async (req: Request) => {
         targetY = Number(body.targetY);
         if (!Number.isInteger(targetX) || !Number.isInteger(targetY)) {
           return json(
-            { message: "목적지 좌표가 올바르지 않습니다.", code: "INVALID_MOVE" },
+            {
+              message: "목적지 좌표가 올바르지 않습니다.",
+              code: "INVALID_MOVE",
+            },
             400,
             origin,
           );
@@ -858,7 +1128,10 @@ Deno.serve(async (req: Request) => {
         );
         if (calculated === null) {
           return json(
-            { message: "현재 행동력으로 이동할 수 없습니다.", code: "INVALID_MOVE" },
+            {
+              message: "현재 행동력으로 이동할 수 없습니다.",
+              code: "INVALID_MOVE",
+            },
             400,
             origin,
           );
@@ -867,58 +1140,170 @@ Deno.serve(async (req: Request) => {
       } else {
         if (!playerFloorReleased(next, character, targetFloor)) {
           return json(
-            { message: "아직 공개되지 않은 층입니다.", code: "INVALID_MOVE" },
+            {
+              message: "아직 공개되지 않은 층입니다.",
+              code: "INVALID_MOVE",
+            },
             403,
             origin,
           );
         }
 
-        const fromTransitions = rules.floors[fromFloor]?.transitions || [];
-        const transition = fromTransitions.find(
-          (item: any) =>
-            Number(item.x) === Number(character.x) &&
-            Number(item.y) === Number(character.y) &&
-            (item.destinations || []).includes(targetFloor),
+        const specialBunkerMove = resolveSpecialBunkerMove(
+          next,
+          rules,
+          character,
+          targetFloor,
         );
-        if (!transition) {
-          return json(
-            { message: "현재 위치에서는 층을 이동할 수 없습니다.", code: "INVALID_MOVE" },
-            400,
-            origin,
-          );
-        }
-        if (Number(character.ap || 0) < 1) {
-          return json(
-            { message: "행동력이 부족합니다.", code: "NOT_ENOUGH_AP" },
-            400,
-            origin,
-          );
-        }
 
-        const destinationTransitions = rules.floors[targetFloor]?.transitions || [];
-        const destination =
-          destinationTransitions.find((item: any) => item.type === transition.type) ||
-          destinationTransitions[0];
-        if (!destination) {
+        if (specialBunkerMove) {
+          targetX = specialBunkerMove.targetX;
+          targetY = specialBunkerMove.targetY;
+          cost = specialBunkerMove.cost;
+          source = specialBunkerMove.source;
+        } else if (involvesBunkerFloor(fromFloor, targetFloor)) {
           return json(
-            { message: "도착 지점이 없습니다.", code: "INVALID_MOVE" },
+            {
+              message: "현재 위치에서는 해당 지하벙커 이동을 할 수 없습니다.",
+              code: "INVALID_MOVE",
+            },
             400,
             origin,
           );
-        }
+        } else {
+          const fromBuilding = buildingFromFloorKey(fromFloor);
+          const targetBuilding = buildingFromFloorKey(targetFloor);
+          const buildingIds = ["main", "living", "research", "support"];
+          const isCrossBuilding =
+            fromBuilding !== targetBuilding &&
+            buildingIds.includes(fromBuilding) &&
+            buildingIds.includes(targetBuilding);
 
-        targetX = Number(destination.x);
-        targetY = Number(destination.y);
-        cost = 1;
-        const labels: Record<string, string> = {
-          stairs: "계단",
-          elevator: "엘리베이터",
-          freight: "화물 승강기",
-          emergency_stairs: "비상계단",
-          service_link: "서비스 통로",
-          main_link: "연결통로",
-        };
-        source = labels[String(transition.type)] || "연결통로";
+          if (isCrossBuilding) {
+            const configuredArrival =
+              rules?.buildingArrivals?.[targetBuilding] ||
+              fallbackBuildingArrival(targetBuilding);
+
+            if (!configuredArrival) {
+              return json(
+                { message: "도착 지점이 없습니다.", code: "INVALID_MOVE" },
+                400,
+                origin,
+              );
+            }
+
+            const arrivalFloor = String(configuredArrival.floor || "");
+            const arrivalX = Number(configuredArrival.x);
+            const arrivalY = Number(configuredArrival.y);
+
+            if (
+              targetFloor !== arrivalFloor ||
+              !Number.isInteger(arrivalX) ||
+              !Number.isInteger(arrivalY) ||
+              !floorRoom(rules, arrivalFloor, arrivalX, arrivalY)
+            ) {
+              return json(
+                {
+                  message: "건물 도착 위치가 올바르지 않습니다.",
+                  code: "INVALID_MOVE",
+                },
+                400,
+                origin,
+              );
+            }
+
+            if (Number(character.ap || 0) < 5) {
+              return json(
+                { message: "행동력이 부족합니다.", code: "NOT_ENOUGH_AP" },
+                400,
+                origin,
+              );
+            }
+
+            targetX = arrivalX;
+            targetY = arrivalY;
+            cost = 5;
+            source = "건물 이동";
+          } else {
+            const fromTransitions = rules.floors[fromFloor]?.transitions || [];
+            const currentRoomId = String(fromCell.roomId || "");
+
+            // 프론트와 동일하게 "계단 방 안"에 있으면 해당 계단을 이용할 수 있게 한다.
+            // 예: 1F 계단이 2칸짜리여도 transition 좌표 한 칸에 정확히 서 있을 필요가 없다.
+            const transition =
+              fromTransitions.find(
+                (item: any) =>
+                  Number(item.x) === Number(character.x) &&
+                  Number(item.y) === Number(character.y) &&
+                  (item.destinations || []).includes(targetFloor),
+              ) ||
+              fromTransitions.find((item: any) => {
+                if (!(item.destinations || []).includes(targetFloor))
+                  return false;
+                const transitionCell = floorRoom(
+                  rules,
+                  fromFloor,
+                  Number(item.x),
+                  Number(item.y),
+                );
+                return (
+                  transitionCell &&
+                  String(transitionCell.roomId || "") === currentRoomId
+                );
+              });
+
+            if (!transition) {
+              return json(
+                {
+                  message: "현재 위치에서는 층을 이동할 수 없습니다.",
+                  code: "INVALID_MOVE",
+                },
+                400,
+                origin,
+              );
+            }
+
+            const destinationTransitions =
+              rules.floors[targetFloor]?.transitions || [];
+            const destination =
+              destinationTransitions.find(
+                (item: any) => item.type === transition.type,
+              ) || destinationTransitions[0];
+            if (!destination) {
+              return json(
+                { message: "도착 지점이 없습니다.", code: "INVALID_MOVE" },
+                400,
+                origin,
+              );
+            }
+
+            targetX = Number(destination.x);
+            targetY = Number(destination.y);
+
+            // 현재 UI 규칙: 계단/비상계단 층 이동은 행동력 미소모.
+            // 엘리베이터 등 다른 연결수단은 기존대로 1 소모.
+            const transitionType = String(transition.type || "");
+            cost = transitionType.toLowerCase().includes("stairs") ? 0 : 1;
+
+            if (Number(character.ap || 0) < cost) {
+              return json(
+                { message: "행동력이 부족합니다.", code: "NOT_ENOUGH_AP" },
+                400,
+                origin,
+              );
+            }
+
+            const labels: Record<string, string> = {
+              stairs: "계단",
+              elevator: "엘리베이터",
+              freight: "화물 승강기",
+              emergency_stairs: "비상계단",
+              service_link: "서비스 통로",
+              main_link: "연결통로",
+            };
+            source = labels[transitionType] || "연결통로";
+          }
+        }
       }
 
       if (Number(character.ap || 0) < cost) {
@@ -932,7 +1317,10 @@ Deno.serve(async (req: Request) => {
       const toCell = floorRoom(rules, targetFloor, targetX!, targetY!);
       if (!toCell) {
         return json(
-          { message: "도착 위치가 올바르지 않습니다.", code: "INVALID_MOVE" },
+          {
+            message: "도착 위치가 올바르지 않습니다.",
+            code: "INVALID_MOVE",
+          },
           400,
           origin,
         );
@@ -957,7 +1345,14 @@ Deno.serve(async (req: Request) => {
           ? cost === 0
             ? `${character.name}이(가) ${toCell.roomLabel} 내부에서 위치를 조정했습니다. 행동력 미소모.`
             : `${character.name}이(가) ${fromCell.roomLabel}에서 ${toCell.roomLabel}(으)로 이동했습니다. 공간 변경 ${cost}회, 행동력 −${cost}.`
-          : `${character.name}이(가) ${source}을 이용해 ${targetFloor}으로 이동했습니다. 행동력 −1.`;
+          : source === "건물 이동"
+            ? `${character.name}이(가) ${fromCell.roomLabel}에서 다른 건물의 ${toCell.roomLabel}(으)로 이동했습니다. 행동력 −${cost}.`
+            : source === "벙커 이동문" ||
+                source === "지하벙커 이동" ||
+                source === "벙커 계단" ||
+                source === "벙커 중앙 출입입구"
+              ? `${character.name}이(가) ${source}을 이용해 ${toCell.roomLabel}(으)로 이동했습니다.${cost ? ` 행동력 −${cost}.` : " 행동력 미소모."}`
+              : `${character.name}이(가) ${source}을 이용해 ${targetFloor}으로 이동했습니다. 행동력 −${cost}.`;
       addLog(next, movementMessage);
 
       const nextVersion = await updateGameRow(game.version, next);
@@ -982,21 +1377,30 @@ Deno.serve(async (req: Request) => {
       }
 
       const game = await getGameRow();
-      if (!game) return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      if (!game) {
+        return json({ message: "게임 상태가 없습니다." }, 409, origin);
+      }
       const next = clone(game.state);
       const rules = game.map_rules;
       const character = next.characters?.find(
         (item: any) => Number(item.id) === Number(account.character_id),
       );
-      if (!character) return json({ message: "캐릭터가 없습니다." }, 403, origin);
+      if (!character) {
+        return json({ message: "캐릭터가 없습니다." }, 403, origin);
+      }
 
       if (next?.exposure?.[character.role]?.features?.investigation === false) {
-        return json({ message: "현재 조사가 공개되지 않았습니다." }, 403, origin);
+        return json(
+          { message: "현재 조사가 공개되지 않았습니다." },
+          403,
+          origin,
+        );
       }
 
       const investigationId = String(body.investigationId || "");
-      const investigation = (rules?.floors?.[character.floor]?.investigations || [])
-        .find((item: any) => String(item.id) === investigationId);
+      const investigation = (
+        rules?.floors?.[character.floor]?.investigations || []
+      ).find((item: any) => String(item.id) === investigationId);
 
       if (
         !investigation ||
@@ -1004,16 +1408,24 @@ Deno.serve(async (req: Request) => {
         Number(investigation.y) !== Number(character.y)
       ) {
         return json(
-          { message: "현재 위치의 조사가 아닙니다.", code: "INVALID_INVESTIGATION" },
+          {
+            message: "현재 위치의 조사가 아닙니다.",
+            code: "INVALID_INVESTIGATION",
+          },
           400,
           origin,
         );
       }
 
-      if (!Array.isArray(character.investigations)) character.investigations = [];
+      if (!Array.isArray(character.investigations)) {
+        character.investigations = [];
+      }
       if (character.investigations.includes(investigationId)) {
         return json(
-          { message: "이미 완료한 조사입니다.", code: "ALREADY_INVESTIGATED" },
+          {
+            message: "이미 완료한 조사입니다.",
+            code: "ALREADY_INVESTIGATED",
+          },
           409,
           origin,
         );
@@ -1030,7 +1442,9 @@ Deno.serve(async (req: Request) => {
         description: investigation.result,
         certainty: investigation.certainty,
         floor: character.floor,
-        room: floorRoom(rules, character.floor, character.x, character.y)?.roomLabel || "",
+        room:
+          floorRoom(rules, character.floor, character.x, character.y)
+            ?.roomLabel || "",
         discoveredBy: character.name,
         fileName: null,
       });
@@ -1039,7 +1453,9 @@ Deno.serve(async (req: Request) => {
         title: investigation.title,
         description: investigation.result,
         floor: character.floor,
-        room: floorRoom(rules, character.floor, character.x, character.y)?.roomLabel || "",
+        room:
+          floorRoom(rules, character.floor, character.x, character.y)
+            ?.roomLabel || "",
       });
       addLog(
         next,
@@ -1065,10 +1481,6 @@ Deno.serve(async (req: Request) => {
     return json({ message: "지원하지 않는 작업입니다." }, 400, origin);
   } catch (error) {
     console.error(error);
-    return json(
-      { message: "서버 처리 중 오류가 발생했습니다." },
-      500,
-      origin,
-    );
+    return json({ message: "서버 처리 중 오류가 발생했습니다." }, 500, origin);
   }
 });

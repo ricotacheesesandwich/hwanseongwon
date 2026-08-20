@@ -1442,7 +1442,17 @@
     });
     elements.modalFooter
       .querySelector("[data-confirm-floor-move]")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
+        if (session?.type === "player" && session?.token) {
+          await performRemoteSpiritMove(
+            character,
+            targetFloor,
+            destinationTransition.x,
+            destinationTransition.y,
+          );
+          return;
+        }
+
         if (character.ap < 1) {
           closeModal();
           showToast("행동력이 부족합니다.");
@@ -2710,6 +2720,7 @@
     y = null,
   ) {
     if (!session?.token || session.type !== "player") return false;
+    const previousFloor = String(character?.floor || "");
     try {
       const result = await remoteApi("move-spirit", {
         targetFloor,
@@ -2738,7 +2749,9 @@
       showToast(
         result.cost > 0
           ? `행동력 ${result.cost}을 사용해 이동했습니다.`
-          : "같은 공간 안에서 이동했습니다.",
+          : moved && String(moved.floor) !== previousFloor
+            ? "이동했습니다. 행동력은 소모되지 않았습니다."
+            : "같은 공간 안에서 이동했습니다.",
       );
       return true;
     } catch (error) {
@@ -10309,6 +10322,18 @@
       return;
     }
 
+    // 원격 플레이에서는 위치/AP를 로컬에서 먼저 바꾸지 않습니다.
+    // 서버 move-spirit가 지하벙커 진입을 검증하고 저장한 뒤 최신 상태를 돌려줍니다.
+    if (session?.type === "player" && session?.token) {
+      void performRemoteSpiritMove(
+        character,
+        targetFloor,
+        destination.x,
+        destination.y,
+      );
+      return;
+    }
+
     settleAllSurvivorFreezeClocks();
 
     const fromFloor = character.floor;
@@ -10359,6 +10384,16 @@
       return;
     }
 
+    if (session?.type === "player" && session?.token) {
+      void performRemoteSpiritMove(
+        character,
+        BUNKER_CENTER_FLOOR,
+        BUNKER_CENTER_POSITION.x,
+        BUNKER_CENTER_POSITION.y,
+      );
+      return;
+    }
+
     settleAllSurvivorFreezeClocks();
     const fromFloor = character.floor;
     const fromRoom = getRoomLabel(character.floor, character.x, character.y);
@@ -10394,6 +10429,16 @@
 
     if (character.floor !== BUNKER_CENTER_FLOOR) {
       showToast("현재 위치에서는 A 구역으로 이동할 수 없습니다.");
+      return;
+    }
+
+    if (session?.type === "player" && session?.token) {
+      void performRemoteSpiritMove(
+        character,
+        "bunker:A",
+        BUNKER_CENTER_RETURN_POSITION.x,
+        BUNKER_CENTER_RETURN_POSITION.y,
+      );
       return;
     }
 
@@ -10499,6 +10544,18 @@
       return;
     }
 
+    // 벙커 A/B/C 간 이동도 반드시 서버가 확정합니다.
+    // 예전처럼 로컬 위치만 먼저 바꾸면 Realtime 갱신 때 서버의 지상 위치로 되돌아갑니다.
+    if (session?.type === "player" && session?.token) {
+      void performRemoteSpiritMove(
+        character,
+        transfer.targetFloor,
+        transfer.targetX,
+        transfer.targetY,
+      );
+      return;
+    }
+
     settleAllSurvivorFreezeClocks();
 
     const fromFloor = character.floor;
@@ -10600,6 +10657,11 @@
     if (!FLOOR_DEFINITIONS[exit.floor]) {
       closeModal();
       showToast("연결된 지상 지도를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (session?.type === "player" && session?.token) {
+      void performRemoteSpiritMove(character, exit.floor, exit.x, exit.y);
       return;
     }
 
@@ -10815,7 +10877,11 @@
       });
   }
 
-  function moveSpiritThroughStairs(character, targetFloor, sourceTransition) {
+  async function moveSpiritThroughStairs(
+    character,
+    targetFloor,
+    sourceTransition,
+  ) {
     if (!isStairTransition(sourceTransition)) {
       closeModal();
       showToast("층 이동은 계단에서만 가능합니다.");
@@ -10843,6 +10909,18 @@
       return;
     }
 
+    // 서버 연결 상태의 플레이어는 층 이동도 반드시 서버에서 확정한다.
+    // 화면에서만 먼저 층을 바꾸면 다음 서버 동기화 때 원래 층으로 되돌아간다.
+    if (session?.type === "player" && session?.token) {
+      await performRemoteSpiritMove(
+        character,
+        targetFloor,
+        destinationTransition.x,
+        destinationTransition.y,
+      );
+      return;
+    }
+
     settleAllSurvivorFreezeClocks();
 
     const fromFloor = character.floor;
@@ -10850,7 +10928,7 @@
     const fromFloorLabel = floorLabelFromKey(character.floor);
     const toFloorLabel = floorLabelFromKey(targetFloor);
 
-    // 행동력은 차감하지 않는다.
+    // 로컬/비서버 미리보기에서도 계단 층 이동은 행동력을 차감하지 않는다.
     character.floor = targetFloor;
     character.x = destinationTransition.x;
     character.y = destinationTransition.y;
