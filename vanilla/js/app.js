@@ -298,6 +298,38 @@
       "#selectedCharacterSummary",
     );
     elements.movementRule = document.querySelector("#movementRule");
+
+    const mapFooter = document.querySelector(".map-panel__footer");
+    if (mapFooter) {
+      let currentLocationJumpButton = mapFooter.querySelector(
+        "[data-jump-current-location]",
+      );
+
+      if (!currentLocationJumpButton) {
+        currentLocationJumpButton = document.createElement("button");
+        currentLocationJumpButton.type = "button";
+        currentLocationJumpButton.className = "current-location-jump-button";
+        currentLocationJumpButton.dataset.jumpCurrentLocation = "";
+        currentLocationJumpButton.dataset.tooltip = "현 위치 이동";
+        currentLocationJumpButton.title = "현 위치 이동";
+        currentLocationJumpButton.setAttribute("aria-label", "현 위치 이동");
+        currentLocationJumpButton.innerHTML = `
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="12" cy="12" r="3.5"></circle>
+            <circle cx="12" cy="12" r="7.5"></circle>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+          </svg>
+        `;
+        mapFooter.appendChild(currentLocationJumpButton);
+      }
+
+      elements.currentLocationJumpButton = currentLocationJumpButton;
+    }
+
     elements.comparisonSection = document.querySelector("#comparisonSection");
     elements.survivorMiniMap = document.querySelector("#survivorMiniMap");
     elements.spiritMiniMap = document.querySelector("#spiritMiniMap");
@@ -346,6 +378,10 @@
     elements.viewModeNav.addEventListener("click", handleViewModeClick);
     elements.floorTabs.addEventListener("click", handleFloorTabClick);
     elements.mapGrid.addEventListener("click", handleMapClick);
+    elements.currentLocationJumpButton?.addEventListener(
+      "click",
+      jumpToCurrentTokenLocation,
+    );
     elements.adminManageButton?.addEventListener("click", () =>
       showAdminHubModal(ui.adminModalTab),
     );
@@ -10140,6 +10176,63 @@
           <div class="compact-team-list">${teamCards}</div>
         </section>
       </div>`;
+  }
+
+  function jumpToCurrentTokenLocation() {
+    const actor = getMovementActor();
+    if (!actor) {
+      showToast("현재 위치를 확인할 캐릭터가 없습니다.");
+      return;
+    }
+
+    ui.mapMode = "floor";
+    ui.currentFloor = actor.floor;
+    ui.currentBuilding = buildingFromFloorKey(actor.floor);
+
+    closeCampusMapPopup();
+    renderAll();
+
+    /*
+     * 건물/층 화면을 먼저 전환한 뒤,
+     * 지도 안에서도 현재 토큰이 보이는 위치까지 자동으로 맞춥니다.
+     * 관리자에서는 현재 선택된 캐릭터,
+     * 플레이어에서는 본인 캐릭터가 기준입니다.
+     */
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const token = elements.mapGrid?.querySelector(
+          `[data-token-character="${actor.id}"]`,
+        );
+        const currentCell = elements.mapGrid?.querySelector(
+          ".map-cell.is-current",
+        );
+        const target = token || currentCell;
+
+        if (target?.scrollIntoView) {
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center",
+          });
+          return;
+        }
+
+        const viewport = elements.mapGrid?.closest(".map-viewport");
+        if (!viewport || !elements.mapGrid) return;
+
+        viewport.scrollTo({
+          left: Math.max(
+            0,
+            (elements.mapGrid.scrollWidth - viewport.clientWidth) / 2,
+          ),
+          top: Math.max(
+            0,
+            (elements.mapGrid.scrollHeight - viewport.clientHeight) / 2,
+          ),
+          behavior: "smooth",
+        });
+      });
+    });
   }
 
   function renderSelectedSummary() {

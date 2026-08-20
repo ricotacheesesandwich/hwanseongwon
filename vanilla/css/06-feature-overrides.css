@@ -13997,3 +13997,203 @@ body.theme-admin .map-grid [data-token-character]:hover {
   background: var(--surface-blue);
   outline: none;
 }
+
+/* =========================================================
+   동결체 라이트모드 — 대강당 라벨 중앙 위치 보정
+   원인:
+   theme-spirit.theme-mode-light의 .map-room span 공통 규칙이
+   대강당 라벨의 absolute 위치를 relative로 덮어쓰던 충돌을 해소합니다.
+   지도 크기/비율/토큰 배치는 변경하지 않습니다.
+   ========================================================= */
+body.theme-spirit.theme-mode-light
+  .map-grid
+  .map-room[data-room-id="auditorium"]
+  > span.map-room__label:first-child,
+body.theme-spirit.theme-mode-light
+  .map-grid
+  .map-room.map-room--auditorium-token-layout
+  > span.map-room__label:first-child {
+  position: absolute;
+  z-index: 40;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  display: block;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #3b1721;
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: none;
+  white-space: nowrap;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+}
+
+/* =========================================================
+   지도 하단 — 현 위치 이동 버튼
+   - 관리자: 현재 선택 캐릭터 위치
+   - 플레이어: 본인 토큰 위치
+   - 지도/방 비율은 변경하지 않음
+   ========================================================= */
+
+.map-panel__footer {
+  grid-template-columns: minmax(230px, auto) 1fr auto auto;
+}
+
+.current-location-jump-button {
+  position: relative;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  justify-self: end;
+  align-self: center;
+  padding: 0;
+  border: 1px solid #c8d8e6;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #173957;
+  box-shadow: 0 5px 14px rgba(23, 57, 87, 0.1);
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.current-location-jump-button:hover,
+.current-location-jump-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: #7398b7;
+  background: #f4f9fd;
+  box-shadow: 0 8px 18px rgba(23, 57, 87, 0.16);
+  outline: none;
+}
+
+.current-location-jump-button:active {
+  transform: translateY(0);
+}
+
+.current-location-jump-button svg {
+  width: 21px;
+  height: 21px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 브라우저 기본 title과 별개로 즉시 보이는 호버 안내 */
+.current-location-jump-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 120;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 160px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: rgba(13, 29, 44, 0.94);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(7, 26, 46, 0.2);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.current-location-jump-button:hover::after,
+.current-location-jump-button:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 관리자 다크 */
+body.theme-admin.theme-mode-dark .current-location-jump-button {
+  border-color: #3d4b52;
+  background: #171d20;
+  color: #e7f3f7;
+  box-shadow: none;
+}
+
+body.theme-admin.theme-mode-dark .current-location-jump-button:hover,
+body.theme-admin.theme-mode-dark .current-location-jump-button:focus-visible {
+  border-color: #60737c;
+  background: #20292d;
+}
+
+/* 동결체 라이트 */
+body.theme-spirit.theme-mode-light .current-location-jump-button {
+  border-color: #d7a9b6;
+  background: #fffafb;
+  color: #7b1f38;
+  box-shadow: 0 5px 14px rgba(94, 24, 43, 0.1);
+}
+
+body.theme-spirit.theme-mode-light .current-location-jump-button:hover,
+body.theme-spirit.theme-mode-light .current-location-jump-button:focus-visible {
+  border-color: #b77486;
+  background: #f8e8ed;
+}
+
+/* 동결체 다크 */
+body.theme-spirit.theme-mode-dark .current-location-jump-button {
+  border-color: #61303c;
+  background: #211216;
+  color: #ffd7df;
+  box-shadow: none;
+}
+
+body.theme-spirit.theme-mode-dark .current-location-jump-button:hover,
+body.theme-spirit.theme-mode-dark .current-location-jump-button:focus-visible {
+  border-color: #8a4657;
+  background: #321922;
+}
+
+/* 생존자 다크 */
+body.theme-survivor.theme-mode-dark .current-location-jump-button {
+  border-color: #38516a;
+  background: #101b28;
+  color: #eaf4ff;
+  box-shadow: none;
+}
+
+body.theme-survivor.theme-mode-dark .current-location-jump-button:hover,
+body.theme-survivor.theme-mode-dark
+  .current-location-jump-button:focus-visible {
+  border-color: #557694;
+  background: #172638;
+}
+
+@media (max-width: 820px) {
+  .map-panel__footer {
+    grid-template-columns: 1fr;
+  }
+
+  .current-location-jump-button {
+    justify-self: end;
+  }
+}
