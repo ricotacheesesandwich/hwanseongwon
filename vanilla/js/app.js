@@ -5,6 +5,16 @@
   const STORAGE_KEY = "shu-investigation-prototype-v2";
   const THEME_STORAGE_PREFIX = "shu-account-theme";
   const EVENT_READ_STORAGE_PREFIX = "shu-emergency-event-read";
+  const SURVIVOR_TUTORIAL_IMAGES = [
+    "1번사진.png",
+    "2번사진.png",
+    "3번사진.png",
+    "4번사진.png",
+    "5번사진.png",
+    "6번사진.png",
+    "7번사진.png",
+    "8번사진.png",
+  ];
   const DEFAULT_THEME_MODE = "light";
   const FLOOR_RELEASE_SCHEMA = 1;
   const FLOOR_ORDER = ["B1", "1F", "2F", "3F", "4F"];
@@ -230,6 +240,7 @@
     operationsTab: "overview",
     siteMapLayer: "surface",
     toastTimer: null,
+    tutorialSlideIndex: 0,
   };
 
   const elements = {};
@@ -268,6 +279,112 @@
     elements.viewModeNav = document.querySelector("#viewModeNav");
     elements.mapViewSection = document.querySelector("#mapViewSection");
     elements.eventButton = document.querySelector("#eventButton");
+
+    if (elements.eventButton) {
+      let survivorHelpButton = document.querySelector("#survivorHelpButton");
+
+      if (!survivorHelpButton) {
+        survivorHelpButton = document.createElement("button");
+        survivorHelpButton.type = "button";
+        survivorHelpButton.id = "survivorHelpButton";
+        survivorHelpButton.className = "survivor-help-button is-hidden";
+        survivorHelpButton.textContent = "?";
+        survivorHelpButton.title = "튜토리얼 / 도움말";
+        survivorHelpButton.setAttribute("aria-label", "튜토리얼 / 도움말");
+        elements.eventButton.insertAdjacentElement(
+          "afterend",
+          survivorHelpButton,
+        );
+      }
+
+      elements.survivorHelpButton = survivorHelpButton;
+    }
+
+    let survivorTutorialBackdrop = document.querySelector(
+      "#survivorTutorialBackdrop",
+    );
+
+    if (!survivorTutorialBackdrop) {
+      survivorTutorialBackdrop = document.createElement("div");
+      survivorTutorialBackdrop.id = "survivorTutorialBackdrop";
+      survivorTutorialBackdrop.className =
+        "survivor-tutorial-backdrop is-hidden";
+      survivorTutorialBackdrop.setAttribute("aria-hidden", "true");
+      survivorTutorialBackdrop.innerHTML = `
+        <section
+          class="survivor-tutorial"
+          role="dialog"
+          aria-modal="true"
+          aria-label="생존자 튜토리얼"
+        >
+          <button
+            type="button"
+            class="survivor-tutorial__close is-hidden"
+            data-survivor-tutorial-close
+            aria-label="튜토리얼 닫기"
+            title="닫기"
+          >×</button>
+
+          <div class="survivor-tutorial__image-wrap">
+            <img
+              class="survivor-tutorial__image"
+              data-survivor-tutorial-image
+              alt=""
+            />
+            <div
+              class="survivor-tutorial__image-placeholder is-hidden"
+              data-survivor-tutorial-placeholder
+            ></div>
+          </div>
+
+          <div class="survivor-tutorial__controls">
+            <button
+              type="button"
+              class="survivor-tutorial__arrow"
+              data-survivor-tutorial-prev
+              aria-label="이전 사진"
+              title="이전 사진"
+            >&lt;</button>
+
+            <span
+              class="survivor-tutorial__counter"
+              data-survivor-tutorial-counter
+              aria-live="polite"
+            ></span>
+
+            <button
+              type="button"
+              class="survivor-tutorial__arrow"
+              data-survivor-tutorial-next
+              aria-label="다음 사진"
+              title="다음 사진"
+            >&gt;</button>
+          </div>
+        </section>
+      `;
+      document.body.appendChild(survivorTutorialBackdrop);
+    }
+
+    elements.survivorTutorialBackdrop = survivorTutorialBackdrop;
+    elements.survivorTutorialImage = survivorTutorialBackdrop.querySelector(
+      "[data-survivor-tutorial-image]",
+    );
+    elements.survivorTutorialPlaceholder =
+      survivorTutorialBackdrop.querySelector(
+        "[data-survivor-tutorial-placeholder]",
+      );
+    elements.survivorTutorialCounter = survivorTutorialBackdrop.querySelector(
+      "[data-survivor-tutorial-counter]",
+    );
+    elements.survivorTutorialPrev = survivorTutorialBackdrop.querySelector(
+      "[data-survivor-tutorial-prev]",
+    );
+    elements.survivorTutorialNext = survivorTutorialBackdrop.querySelector(
+      "[data-survivor-tutorial-next]",
+    );
+    elements.survivorTutorialClose = survivorTutorialBackdrop.querySelector(
+      "[data-survivor-tutorial-close]",
+    );
     elements.siteMapButton = document.querySelector("#siteMapButton");
     elements.campusMapBackdrop = document.querySelector("#campusMapBackdrop");
     elements.campusMapPopup = document.querySelector("#campusMapPopup");
@@ -359,6 +476,31 @@
     elements.logoutButton.addEventListener("click", logout);
     elements.themeToggleButton?.addEventListener("click", toggleThemeMode);
     elements.eventButton.addEventListener("click", showEmergencyEvent);
+    elements.survivorHelpButton?.addEventListener("click", () => {
+      showSurvivorTutorial();
+    });
+    elements.survivorTutorialPrev?.addEventListener("click", () => {
+      moveSurvivorTutorial(-1);
+    });
+    elements.survivorTutorialNext?.addEventListener("click", () => {
+      moveSurvivorTutorial(1);
+    });
+    elements.survivorTutorialClose?.addEventListener("click", () => {
+      completeAndCloseSurvivorTutorial();
+    });
+    elements.survivorTutorialImage?.addEventListener("error", () => {
+      elements.survivorTutorialImage?.classList.add("is-hidden");
+      if (elements.survivorTutorialPlaceholder) {
+        const imageSrc =
+          SURVIVOR_TUTORIAL_IMAGES[ui.tutorialSlideIndex] || "튜토리얼 이미지";
+        elements.survivorTutorialPlaceholder.textContent = imageSrc;
+        elements.survivorTutorialPlaceholder.classList.remove("is-hidden");
+      }
+    });
+    elements.survivorTutorialImage?.addEventListener("load", () => {
+      elements.survivorTutorialImage?.classList.remove("is-hidden");
+      elements.survivorTutorialPlaceholder?.classList.add("is-hidden");
+    });
     elements.adminOperationsButton.addEventListener(
       "click",
       openAdminOperationsPage,
@@ -828,6 +970,7 @@
     elements.appView.classList.remove("is-hidden");
     resetSpiritActionPointsAt21IfNeeded();
     renderAll();
+    maybeOpenFirstSurvivorTutorial();
   }
 
   function applySessionTheme() {
@@ -2981,7 +3124,7 @@
     );
 
     return {
-      schema: 2,
+      schema: 3,
       columns: GRID_COLUMNS,
       rows: GRID_ROWS,
       buildingArrivals,
@@ -3027,18 +3170,7 @@
         createCharacter(111, "이건하", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(112, "유수담", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(113, "유애호", "survivor", 0, 0, "1F", 2, 3, [], false),
-        createCharacter(
-          114,
-          "사공이진",
-          "survivor",
-          0,
-          0,
-          "1F",
-          2,
-          3,
-          [],
-          false,
-        ),
+        createCharacter(114, "사공이진", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(115, "권신예", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(116, "하설유", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(117, "하도야", "survivor", 0, 0, "1F", 2, 3, [], false),
@@ -3048,6 +3180,9 @@
         createCharacter(121, "오현주", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(122, "염원", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(123, "신 결", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(124, "제하연", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(125, "이루한", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(126, "백우양", "survivor", 0, 0, "1F", 2, 3, [], false),
       ],
       teams: [
         {
@@ -3114,6 +3249,7 @@
       inventory: [],
       investigations: [],
       records: [],
+      tutorialSeen: false,
       online,
     };
   }
@@ -4139,21 +4275,99 @@
     }).format(new Date(iso));
   }
 
-  const BURNING_LEVELS = [
-    { label: "안정", description: "진행 징후가 없습니다." },
-    { label: "미세 진행", description: "공간의 이상 징후가 시작되었습니다." },
-    { label: "상승", description: "진행 속도가 눈에 띄게 증가합니다." },
-    { label: "과열", description: "위험 단계로 진입했습니다." },
-    { label: "임계", description: "즉각적인 운영 개입이 필요합니다." },
-    { label: "붕괴", description: "공간 진행도가 최종 단계에 도달했습니다." },
-  ];
+  const LEGACY_SPACE_TIME_ADDITIONS = [0, 0.2, 0.5, 1.2, 2.0, 2.5];
+
+  /*
+   * 공간 진행도는 "기본 1.0배 + 추가 배속" 방식으로 관리한다.
+   * 관리자 목록에는 +0.0 ~ +4.0을 0.1 단위로 노출한다.
+   *
+   * 예)
+   * +0.0 = 실제 1.0배 진행
+   * +0.1 = 실제 1.1배 진행
+   * +1.5 = 실제 2.5배 진행
+   * +4.0 = 실제 5.0배 진행
+   */
+  const SPACE_BURNING_ADD_MIN = 0.0;
+  const SPACE_BURNING_ADD_MAX = 4.0;
+  const SPACE_BURNING_ADD_STEP = 0.1;
+  const SPACE_BURNING_MODE = "direct-addition-v3";
+  const PREVIOUS_SPACE_MULTIPLIER_MODE = "direct-multiplier-v2";
+
+  const SPACE_BURNING_OPTIONS = Array.from(
+    {
+      length:
+        Math.round(
+          (SPACE_BURNING_ADD_MAX - SPACE_BURNING_ADD_MIN) /
+            SPACE_BURNING_ADD_STEP,
+        ) + 1,
+    },
+    (_, index) =>
+      Number(
+        (
+          SPACE_BURNING_ADD_MIN +
+          index * SPACE_BURNING_ADD_STEP
+        ).toFixed(1),
+      ),
+  );
 
   function spaceBurningKey(floor, roomId) {
     return `${floor}::${roomId}`;
   }
 
-  function getSpaceBurningLevel(floor, roomId) {
-    return Number(state.spaceBurning?.[spaceBurningKey(floor, roomId)] || 0);
+  function clampSpaceBurningAddition(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return SPACE_BURNING_ADD_MIN;
+    return Number(
+      Math.min(
+        SPACE_BURNING_ADD_MAX,
+        Math.max(SPACE_BURNING_ADD_MIN, numeric),
+      ).toFixed(1),
+    );
+  }
+
+  function getSpaceBurningAddition(floor, roomId) {
+    const raw = Number(
+      state.spaceBurning?.[spaceBurningKey(floor, roomId)] ?? 0,
+    );
+
+    if (state.spaceBurningMode === SPACE_BURNING_MODE) {
+      return clampSpaceBurningAddition(raw);
+    }
+
+    /*
+     * 직전 버전(direct-multiplier-v2)은 실제 총배율 1.0~4.0을
+     * 저장했으므로 추가 배속으로 안전하게 환산한다.
+     */
+    if (state.spaceBurningMode === PREVIOUS_SPACE_MULTIPLIER_MODE) {
+      return clampSpaceBurningAddition(Math.max(0, raw - 1));
+    }
+
+    /*
+     * 더 이전 서버 상태는 0~5 단계값을 저장했으므로
+     * 해당 단계의 추가 배속값을 그대로 이어받는다.
+     */
+    const legacyLevel = Math.max(
+      0,
+      Math.min(LEGACY_SPACE_TIME_ADDITIONS.length - 1, Math.round(raw || 0)),
+    );
+
+    return clampSpaceBurningAddition(
+      Number(LEGACY_SPACE_TIME_ADDITIONS[legacyLevel] || 0),
+    );
+  }
+
+  function getSpaceBurningMultiplier(floor, roomId) {
+    return Number((1 + getSpaceBurningAddition(floor, roomId)).toFixed(1));
+  }
+
+  function getSpaceBurningVisualLevel(floor, roomId) {
+    const multiplier = getSpaceBurningMultiplier(floor, roomId);
+    if (multiplier <= 1.0) return 0;
+    if (multiplier <= 1.5) return 1;
+    if (multiplier <= 2.0) return 2;
+    if (multiplier <= 2.5) return 3;
+    if (multiplier <= 3.0) return 4;
+    return 5;
   }
 
   function getUniqueRooms(floorId) {
@@ -4325,6 +4539,136 @@
     );
   }
 
+  function currentPlayerCharacter() {
+    if (session?.type !== "player") return null;
+    return getCharacter(session.characterId);
+  }
+
+  function isCurrentPlayerSurvivor() {
+    return currentPlayerCharacter()?.role === "survivor";
+  }
+
+  function renderSurvivorTutorialSlide() {
+    if (!elements.survivorTutorialBackdrop) return;
+
+    const lastIndex = SURVIVOR_TUTORIAL_IMAGES.length - 1;
+    ui.tutorialSlideIndex = Math.max(
+      0,
+      Math.min(lastIndex, Number(ui.tutorialSlideIndex || 0)),
+    );
+
+    const imageSrc = SURVIVOR_TUTORIAL_IMAGES[ui.tutorialSlideIndex];
+    const pageNumber = ui.tutorialSlideIndex + 1;
+
+    if (elements.survivorTutorialImage) {
+      elements.survivorTutorialImage.classList.remove("is-hidden");
+      elements.survivorTutorialImage.alt =
+        `생존자 튜토리얼 ${pageNumber}번 사진`;
+      elements.survivorTutorialImage.src = imageSrc;
+    }
+
+    if (elements.survivorTutorialPlaceholder) {
+      elements.survivorTutorialPlaceholder.textContent = imageSrc;
+      elements.survivorTutorialPlaceholder.classList.add("is-hidden");
+    }
+
+    if (elements.survivorTutorialCounter) {
+      elements.survivorTutorialCounter.textContent =
+        `${pageNumber} / ${SURVIVOR_TUTORIAL_IMAGES.length}`;
+    }
+
+    if (elements.survivorTutorialPrev) {
+      elements.survivorTutorialPrev.disabled = ui.tutorialSlideIndex === 0;
+    }
+
+    if (elements.survivorTutorialNext) {
+      elements.survivorTutorialNext.disabled =
+        ui.tutorialSlideIndex === lastIndex;
+    }
+
+    if (elements.survivorTutorialClose) {
+      elements.survivorTutorialClose.classList.toggle(
+        "is-hidden",
+        ui.tutorialSlideIndex !== lastIndex,
+      );
+    }
+  }
+
+  function showSurvivorTutorial() {
+    if (!isCurrentPlayerSurvivor()) return;
+
+    ui.tutorialSlideIndex = 0;
+    renderSurvivorTutorialSlide();
+    elements.survivorTutorialBackdrop?.classList.remove("is-hidden");
+    elements.survivorTutorialBackdrop?.setAttribute("aria-hidden", "false");
+  }
+
+  function moveSurvivorTutorial(direction) {
+    if (
+      !isCurrentPlayerSurvivor() ||
+      elements.survivorTutorialBackdrop?.classList.contains("is-hidden")
+    ) {
+      return;
+    }
+
+    const lastIndex = SURVIVOR_TUTORIAL_IMAGES.length - 1;
+    const nextIndex = Math.max(
+      0,
+      Math.min(lastIndex, ui.tutorialSlideIndex + Number(direction || 0)),
+    );
+
+    if (nextIndex === ui.tutorialSlideIndex) return;
+    ui.tutorialSlideIndex = nextIndex;
+    renderSurvivorTutorialSlide();
+  }
+
+  async function completeAndCloseSurvivorTutorial() {
+    const character = currentPlayerCharacter();
+    const lastIndex = SURVIVOR_TUTORIAL_IMAGES.length - 1;
+
+    if (
+      !character ||
+      character.role !== "survivor" ||
+      ui.tutorialSlideIndex !== lastIndex
+    ) {
+      return;
+    }
+
+    elements.survivorTutorialBackdrop?.classList.add("is-hidden");
+    elements.survivorTutorialBackdrop?.setAttribute("aria-hidden", "true");
+
+    if (character.tutorialSeen === true) return;
+
+    character.tutorialSeen = true;
+
+    if (!session?.token || !isRemoteConfigured()) return;
+
+    try {
+      const result = await remoteApi("complete-tutorial");
+      remoteState.version = Math.max(
+        remoteState.version,
+        Number(result?.version || 0),
+      );
+    } catch (error) {
+      console.error("튜토리얼 완료 상태 저장 실패", error);
+      character.tutorialSeen = false;
+      showToast(
+        "튜토리얼 확인 상태를 서버에 저장하지 못했습니다. 다음 로그인 때 다시 표시될 수 있습니다.",
+        4200,
+      );
+    }
+  }
+
+  function maybeOpenFirstSurvivorTutorial() {
+    const character = currentPlayerCharacter();
+    if (!character || character.role !== "survivor") return;
+    if (character.tutorialSeen === true) return;
+
+    window.requestAnimationFrame(() => {
+      showSurvivorTutorial();
+    });
+  }
+
   function showEmergencyEvent() {
     const events = getVisibleEmergencyEvents();
 
@@ -4432,7 +4776,6 @@
 
   /* ===== 2026-08-02 규칙 개편 오버라이드 ===== */
   const FREEZE_STAGE_THRESHOLDS = [0, 18, 42, 66, 90, 120];
-  const SPACE_TIME_ADDITIONS = [0, 0.2, 0.5, 1.2, 2.0, 2.5];
   const EXPOSURE_PRESETS = [
     { id: "cold", label: "동결체의 냉기에 노출", add: 0.2 },
     { id: "diluted_skin", label: "희석액 피부 접촉", add: 0.3 },
@@ -4507,7 +4850,7 @@
 
         const rows = getUniqueRooms(floor)
           .map((room) => {
-            const level = getSpaceBurningLevel(floor, room.id);
+            const addition = getSpaceBurningAddition(floor, room.id);
 
             /*
              * research:3F처럼 floor key 자체에 ':'가 포함될 수 있으므로
@@ -4521,20 +4864,18 @@
                 <strong>${escapeHtml(room.label)}</strong>
                 <small>${escapeHtml(floorLabel)} · 관리자 전용</small>
                 <i class="burning-level-badge">
-                  ${level}단계 · 공간 체류 +${SPACE_TIME_ADDITIONS[level].toFixed(1)}배속
+                  추가 배속 +${addition.toFixed(1)}
                 </i>
               </span>
               <select
                 class="form-control"
                 name="burning:${encodedFloor}:${encodedRoomId}"
               >
-                ${BURNING_LEVELS.map(
-                  (item, index) =>
-                    `<option value="${index}" ${
-                      index === level ? "selected" : ""
-                    }>${index}단계 · +${SPACE_TIME_ADDITIONS[index].toFixed(
-                      1,
-                    )}배속</option>`,
+                ${SPACE_BURNING_OPTIONS.map(
+                  (option) =>
+                    `<option value="${option.toFixed(1)}" ${
+                      Math.abs(option - addition) < 0.001 ? "selected" : ""
+                    }>+${option.toFixed(1)}배속</option>`,
                 ).join("")}
               </select>
             </label>`;
@@ -4561,7 +4902,7 @@
     return `<form data-burning-settings-form>
       <section class="operations-card settings-guide">
         <h3>공간 진행도 시간 적용</h3>
-        <p>1단계 +0.2 · 2단계 +0.5 · 3단계 +1.2 · 4단계 +2.0 · 5단계 +2.5배속. 생존자와 동결체 화면에는 단계 및 배율이 노출되지 않습니다.</p>
+        <p>공간 진행 추가 배속을 +0.0부터 +4.0까지 0.1 단위로 직접 지정합니다. 생존자와 동결체 화면에는 배율이 노출되지 않습니다.</p>
       </section>
       <div class="burning-admin-grid">${groups}</div>
       <div class="settings-save-bar">
@@ -4905,6 +5246,7 @@
       event.preventDefault();
       state.characters.forEach((c) => settleFreezeClock(c));
       const fd = new FormData(burn);
+      const nextSpaceBurning = {};
       for (const [name, value] of fd.entries()) {
         if (!name.startsWith("burning:")) continue;
 
@@ -4916,15 +5258,15 @@
 
         if (!FLOOR_DEFINITIONS[floor]) continue;
 
-        state.spaceBurning[spaceBurningKey(floor, roomId)] = Math.max(
-          0,
-          Math.min(5, Number(value)),
-        );
+        nextSpaceBurning[spaceBurningKey(floor, roomId)] =
+          clampSpaceBurningAddition(value);
       }
-      addLog("운영진이 공간별 진행도를 저장했습니다.");
+      state.spaceBurning = nextSpaceBurning;
+      state.spaceBurningMode = SPACE_BURNING_MODE;
+      addLog("운영진이 공간별 체류 배속을 저장했습니다.");
       persistState();
       renderAdminOperationsPage();
-      showToast("공간 진행도를 저장했습니다.");
+      showToast("공간 체류 배속을 저장했습니다.");
       return;
     }
     const eventForm = event.target.closest("[data-emergency-event-form]");
@@ -5011,7 +5353,7 @@
     if (!character) return 0;
     const floor = floorOverride || character.floor;
     const roomId = roomOverride || getRoomId(floor, character.x, character.y);
-    return SPACE_TIME_ADDITIONS[getSpaceBurningLevel(floor, roomId)] || 0;
+    return Math.max(0, getSpaceBurningMultiplier(floor, roomId) - 1);
   }
 
   function formatClockSeconds(totalSeconds) {
@@ -5366,6 +5708,8 @@
       if (!Array.isArray(character.records)) character.records = [];
       if (!Array.isArray(character.investigations))
         character.investigations = [];
+      if (typeof character.tutorialSeen !== "boolean")
+        character.tutorialSeen = false;
       character.inventory.forEach((item) => {
         normalizeStoredInventoryItem(item);
         if (item.itemType === "resource") item.certainty = "confirmed";
@@ -6291,7 +6635,7 @@
               `<span class="freeze-modifier"><span>${escapeHtml(modifier.label)}${modifier.reason ? ` · ${escapeHtml(modifier.reason)}` : ""} · ${modifier.min ? `최소 ${Number(modifier.min).toFixed(1)}배` : `+${Number(modifier.add).toFixed(1)}`}</span><button type="button" data-remove-time-modifier="${character.id}" data-modifier-id="${modifier.id}" aria-label="제거">×</button></span>`,
           )
           .join("");
-        return `<article class="freeze-card"><div class="freeze-card__head"><div><h3>${escapeHtml(character.name)}</h3><small>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</small></div><div class="freeze-card__actions">${roleChipMarkup(character.role)}<button type="button" class="button button--small button--danger" data-reset-infection-clock="${character.id}">시간 초기화</button></div></div><div class="freeze-card__metrics"><div><span>감염 잔여 시간</span><strong data-infection-clock="${character.id}">${infectionClockText(character)}</strong></div><div><span>현재 단계</span><strong data-infection-stage="${character.id}">${freezeStageLabel(stage)}</strong></div><div><span>현재 시간 배율</span><strong data-infection-multiplier="${character.id}">×${clockMultiplier(character).toFixed(1)}</strong></div></div><div class="freeze-progress"><i data-infection-progress="${character.id}" style="width:${percentage}%"></i></div><p class="space-multiplier-note">진행 경과: ${hours.toFixed(3)}시간 / 120시간<br>${stage >= 5 ? "최종 단계 도달" : `다음 단계 전환까지 감염 진행량 ${Math.max(0, next - hours).toFixed(2)}시간`}<br>현재 공간 진행도 ${getSpaceBurningLevel(character.floor, getRoomId(character.floor, character.x, character.y))}단계 → +${currentSpaceAddition(character).toFixed(1)}배속</p><div class="freeze-modifiers">${modifiers || `<span class="muted-text">추가 노출 배율 없음</span>`}</div><div class="infection-control-stack">
+        return `<article class="freeze-card"><div class="freeze-card__head"><div><h3>${escapeHtml(character.name)}</h3><small>${escapeHtml(character.floor)} · ${escapeHtml(getRoomLabel(character.floor, character.x, character.y))}</small></div><div class="freeze-card__actions">${roleChipMarkup(character.role)}<button type="button" class="button button--small button--danger" data-reset-infection-clock="${character.id}">시간 초기화</button></div></div><div class="freeze-card__metrics"><div><span>감염 잔여 시간</span><strong data-infection-clock="${character.id}">${infectionClockText(character)}</strong></div><div><span>현재 단계</span><strong data-infection-stage="${character.id}">${freezeStageLabel(stage)}</strong></div><div><span>현재 시간 배율</span><strong data-infection-multiplier="${character.id}">×${clockMultiplier(character).toFixed(1)}</strong></div></div><div class="freeze-progress"><i data-infection-progress="${character.id}" style="width:${percentage}%"></i></div><p class="space-multiplier-note">진행 경과: ${hours.toFixed(3)}시간 / 120시간<br>${stage >= 5 ? "최종 단계 도달" : `다음 단계 전환까지 감염 진행량 ${Math.max(0, next - hours).toFixed(2)}시간`}<br>현재 공간 체류 배속 ×${getSpaceBurningMultiplier(character.floor, getRoomId(character.floor, character.x, character.y)).toFixed(1)}</p><div class="freeze-modifiers">${modifiers || `<span class="muted-text">추가 노출 배율 없음</span>`}</div><div class="infection-control-stack">
           <form class="freeze-form freeze-form--preset" data-v3-time-modifier-form>
             <input type="hidden" name="characterId" value="${character.id}">
             <label>
@@ -8129,11 +8473,18 @@
       "1F",
       { id: "support_corridor", label: "복도", color: "#e3e6e8" },
       [
+        /*
+         * 사용자 제공 관리지원동 1F 안내도 기준.
+         * 전체 12×8 격자 안에서 실제 방 비율을 그대로 맞춘다.
+         *
+         * 상단: 2 / 2 / 2 / 4 / 2칸
+         * 중앙 복도: 12×4칸
+         * 하단: 3 / 2 / 2 / 4 / 1칸
+         */
         room("support_cctv", "중앙 CCTV실", 0, 0, 1, 1, "#f3f4f5"),
         room("support_access", "출입 관리실", 2, 0, 3, 1, "#f3f4f5"),
-        room("support_broadcast", "비상 방송실", 4, 0, 5, 1, "#f3f4f5"),
-        room("support_satellite", "위성통신 단말실", 6, 0, 7, 1, "#f3f4f5"),
-        room("support_fire", "소방설비 제어실", 8, 0, 9, 1, "#f3f4f5"),
+        room("support_broadcast", "방송실", 4, 0, 5, 1, "#f3f4f5"),
+        room("support_management", "관리지원실", 6, 0, 9, 1, "#f3f4f5"),
         room("support_stairs", "비상계단", 10, 0, 11, 1, "#eceff1"),
 
         {
@@ -8144,8 +8495,7 @@
         room("support_generator", "비상 발전기실", 0, 6, 2, 7, "#f3f4f5"),
         room("support_fuel", "연료 탱크실", 3, 6, 4, 7, "#f3f4f5"),
         room("support_water", "급수펌프 정수설비", 5, 6, 6, 7, "#f3f4f5"),
-        room("support_hvac", "중앙 공조 제습 설비", 7, 6, 9, 7, "#f3f4f5"),
-        room("support_firewall", "방화문 제어반", 10, 6, 10, 7, "#f7eded"),
+        room("support_hvac", "중앙 공조 제습 설비", 7, 6, 10, 7, "#f3f4f5"),
         room("support_elevator", "엘리베이터", 11, 6, 11, 7, "#eceff1"),
       ],
       [
@@ -8159,9 +8509,9 @@
         type: "dashed-info",
         label: "내부 서버, 전용 와이파이",
         x1: 2,
-        y1: 2,
+        y1: 3,
         x2: 9,
-        y2: 5,
+        y2: 4,
       },
     ];
 
@@ -9511,7 +9861,10 @@
     const clampLeft = (value) =>
       Math.max(
         viewportPadding,
-        Math.min(value, window.innerWidth - portalRect.width - viewportPadding),
+        Math.min(
+          value,
+          window.innerWidth - portalRect.width - viewportPadding,
+        ),
       );
     const clampTop = (value) =>
       Math.max(
@@ -9564,13 +9917,15 @@
           0,
         );
         const distance =
-          Math.abs(left - toggleRect.left) + Math.abs(top - centeredTop) * 0.15;
+          Math.abs(left - toggleRect.left) +
+          Math.abs(top - centeredTop) * 0.15;
         candidates.push({ left, top, tokenOverlap, distance });
       }
     }
 
     candidates.sort(
-      (a, b) => a.tokenOverlap - b.tokenOverlap || a.distance - b.distance,
+      (a, b) =>
+        a.tokenOverlap - b.tokenOverlap || a.distance - b.distance,
     );
 
     const best = candidates[0];
@@ -9725,8 +10080,15 @@
       roomElement.style.gridColumn = `${roomDefinition.x1 + 1} / ${roomDefinition.x2 + 2}`;
       roomElement.style.gridRow = `${roomDefinition.y1 + 1} / ${roomDefinition.y2 + 2}`;
       roomElement.style.setProperty("--room-color", roomDefinition.color);
-      const burningLevel = getSpaceBurningLevel(floor.id, roomDefinition.id);
-      roomElement.dataset.burningLevel = String(burningLevel);
+      const spaceMultiplier = getSpaceBurningMultiplier(
+        floor.id,
+        roomDefinition.id,
+      );
+      const burningVisualLevel = getSpaceBurningVisualLevel(
+        floor.id,
+        roomDefinition.id,
+      );
+      roomElement.dataset.burningLevel = String(burningVisualLevel);
 
       if (roomDefinition.id === activeRoomId)
         roomElement.classList.add("is-active-room");
@@ -9753,10 +10115,7 @@
       const canShowAdminSpaceMultiplier =
         session.type === "admin" &&
         perspective.mode === "admin" &&
-        burningLevel > 0;
-
-      const spaceMultiplier =
-        1 + Number(SPACE_TIME_ADDITIONS[burningLevel] || 0);
+        spaceMultiplier > 1.0;
 
       const adminSpaceMultiplierBadge = canShowAdminSpaceMultiplier
         ? `<span class="map-room__admin-space-multiplier" aria-label="공간 배속 ${spaceMultiplier.toFixed(1)}배">
@@ -10203,9 +10562,8 @@
         const token = elements.mapGrid?.querySelector(
           `[data-token-character="${actor.id}"]`,
         );
-        const currentCell = elements.mapGrid?.querySelector(
-          ".map-cell.is-current",
-        );
+        const currentCell =
+          elements.mapGrid?.querySelector(".map-cell.is-current");
         const target = token || currentCell;
 
         if (target?.scrollIntoView) {
@@ -10312,6 +10670,14 @@
     renderSessionBadge();
     renderViewModeNav();
     renderEventButton();
+
+    const showSurvivorHelp =
+      session.type === "player" &&
+      getCharacter(session.characterId)?.role === "survivor";
+    elements.survivorHelpButton?.classList.toggle(
+      "is-hidden",
+      !showSurvivorHelp,
+    );
 
     if (isAdmin && ui.operationsOpen) {
       renderAdminOperationsPage();
@@ -10892,7 +11258,12 @@
     }
 
     if (session?.type === "player" && session?.token) {
-      void performRemoteSpiritMove(character, exit.floor, exit.x, exit.y);
+      void performRemoteSpiritMove(
+        character,
+        exit.floor,
+        exit.x,
+        exit.y,
+      );
       return;
     }
 
