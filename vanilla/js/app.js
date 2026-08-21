@@ -1373,7 +1373,7 @@
         </section>
 
         <section class="panel-card">
-          <div class="panel-card__header">조사 자료 지급</div>
+          <div class="panel-card__header">조사 물품 지급</div>
           <form class="panel-card__body form-stack" data-evidence-form>
             <input class="form-control" name="title" placeholder="자료 이름" required />
             <textarea class="form-control" name="description" placeholder="자료 설명" required></textarea>
@@ -2162,6 +2162,17 @@
       return;
     }
 
+    const investigationUseButton = event.target.closest(
+      "[data-use-investigation-item]",
+    );
+    if (investigationUseButton) {
+      useInvestigationItem(
+        Number(investigationUseButton.dataset.characterId),
+        investigationUseButton.dataset.useInvestigationItem,
+      );
+      return;
+    }
+
     const evidenceButton = event.target.closest("[data-evidence-id]");
     if (evidenceButton) {
       const evidence = collectAllEvidence().find(
@@ -2680,7 +2691,7 @@
     openModal({
       eyebrow: "DEMO DATA",
       title: "시제품 데이터를 초기화할까요?",
-      body: "<p>캐릭터 위치, 행동력, 조사 자료, 상태이상과 운영 로그가 최초 상태로 돌아갑니다.</p>",
+      body: "<p>캐릭터 위치, 행동력, 조사 물품, 상태이상과 운영 로그가 최초 상태로 돌아갑니다.</p>",
       footer: `<button type="button" class="button" data-modal-close>취소</button><button type="button" class="button button--danger" data-confirm-reset>초기화</button>`,
     });
     elements.modalFooter
@@ -3065,7 +3076,7 @@
       closeModal();
       renderAll();
       showToast(
-        `자료 「${result.evidenceTitle || "조사자료"}」을(를) 획득했습니다.`,
+        `자료 「${result.evidenceTitle || "조사물품"}」을(를) 획득했습니다.`,
       );
       return true;
     } catch (error) {
@@ -4715,7 +4726,8 @@
               const meta =
                 item.itemType === "resource" ||
                 item.itemType === "basic" ||
-                item.itemType === "warming"
+                item.itemType === "warming" ||
+                item.itemType === "investigation"
                   ? inventoryItemBadgeMarkup(item)
                   : "";
               const badgeMarkup = meta
@@ -4724,7 +4736,15 @@
               const itemClass =
                 item.itemType === "resource" ? " inventory-item--resource" : "";
               const canConsumeWarming = item.itemType === "warming";
-              return `<div class="inventory-item-row${canConsumeWarming ? " has-use-action" : ""}"><button type="button" class="inventory-item${itemClass}" data-evidence-id="${escapeHtml(item.uid)}"><span class="inventory-item__head"><strong>${escapeHtml(item.title)}</strong>${badgeMarkup}</span><p>${escapeHtml(item.description)}</p></button>${canConsumeWarming ? `<button type="button" class="button button--primary inventory-item__use" data-use-warming-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>` : ""}</div>`;
+              const canConsumeInvestigation =
+                item.itemType === "investigation" && item.consumable === true;
+              const hasUseAction = canConsumeWarming || canConsumeInvestigation;
+              const useButton = canConsumeWarming
+                ? `<button type="button" class="button button--primary inventory-item__use" data-use-warming-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>`
+                : canConsumeInvestigation
+                  ? `<button type="button" class="button button--primary inventory-item__use" data-use-investigation-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>`
+                  : "";
+              return `<div class="inventory-item-row${hasUseAction ? " has-use-action" : ""}"><button type="button" class="inventory-item${itemClass}" data-evidence-id="${escapeHtml(item.uid)}"><span class="inventory-item__head"><strong>${escapeHtml(item.title)}</strong>${badgeMarkup}</span><p>${escapeHtml(item.description)}</p></button>${useButton}</div>`;
             })
             .join("")
         : emptyStateMarkup("현재 소지품이 없습니다.");
@@ -5041,6 +5061,17 @@
       useWarmingItem(
         Number(warmingUseButton.dataset.characterId),
         warmingUseButton.dataset.useWarmingItem,
+      );
+      return;
+    }
+
+    const investigationUseButton = event.target.closest(
+      "[data-use-investigation-item]",
+    );
+    if (investigationUseButton) {
+      useInvestigationItem(
+        Number(investigationUseButton.dataset.characterId),
+        investigationUseButton.dataset.useInvestigationItem,
       );
       return;
     }
@@ -6719,6 +6750,8 @@
       sourceId: template.id || null,
       itemType: template.itemType,
       healAmount: template.healAmount || 0,
+      consumable:
+        template.itemType === "investigation" && template.consumable === true,
       title: template.title,
       description: template.description,
       certainty: template.certainty || "confirmed",
@@ -6756,7 +6789,9 @@
                 ${
                   item.itemType === "warming"
                     ? `<button type="button" class="button button--small button--primary" data-use-warming-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>`
-                    : ""
+                    : item.itemType === "investigation" && item.consumable
+                      ? `<button type="button" class="button button--small button--primary" data-use-investigation-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>`
+                      : ""
                 }
                 <button type="button" class="button button--small button--danger" data-admin-inventory-delete="${escapeHtml(item.uid)}" data-character-id="${character.id}">삭제</button>
               </div>
@@ -6992,9 +7027,11 @@
             ? `[회복 +${item.healAmount}]`
             : item.itemType === "warming"
               ? "[방한 아이템]"
-              : item.itemType === "basic"
-                ? "[소지품]"
-                : "[조사 자료]";
+              : item.itemType === "investigation"
+                ? "[조사 아이템]"
+                : item.itemType === "basic"
+                  ? "[소지품]"
+                  : "[조사 물품]";
         return `<option value="${escapeHtml(item.id)}">${escapeHtml(`${prefix} ${item.title}`)}</option>`;
       })
       .join("");
@@ -7010,14 +7047,18 @@
               ? `<span class="resource-template-card__symbol">HP</span>`
               : item.itemType === "warming"
                 ? `<span class="resource-template-card__symbol">防</span>`
-                : "▤";
+                : item.itemType === "investigation"
+                  ? `<span class="resource-template-card__symbol">ITEM</span>`
+                  : "▤";
 
       const meta =
         item.itemType === "healing"
           ? `<span class="inventory-type-badge inventory-type-badge--healing">체력 +${item.healAmount}</span>`
           : item.itemType === "warming"
             ? ""
-            : `${certaintyChipMarkup(item.certainty)}<small class="resource-file-meta">발견 장소 · ${escapeHtml(resourceDiscoveryLocationText(item))}</small><small class="resource-file-meta">${item.originalName ? `${escapeHtml(item.originalName)} · ${formatFileSizeV3(item.originalSize || 0)}` : "원본 파일 없음"}</small>`;
+            : item.itemType === "investigation"
+              ? ""
+              : `${certaintyChipMarkup(item.certainty)}<small class="resource-file-meta">발견 장소 · ${escapeHtml(resourceDiscoveryLocationText(item))}</small><small class="resource-file-meta">${item.originalName ? `${escapeHtml(item.originalName)} · ${formatFileSizeV3(item.originalSize || 0)}` : "원본 파일 없음"}</small>`;
       return `<article class="resource-template-card resource-template-card--${item.itemType}"><span class="resource-template-card__thumb">${thumb}</span><div class="resource-template-card__copy"><div class="resource-template-card__title-row"><strong>${escapeHtml(item.title)}</strong>${inventoryItemBadgeMarkup(item)}</div><p>${escapeHtml(item.description)}</p>${meta}</div><div class="resource-template-card__actions"><button type="button" class="button button--small" data-preview-resource="${escapeHtml(item.id)}">미리보기</button><button type="button" class="button button--small button--danger" data-delete-resource="${escapeHtml(item.id)}">삭제</button></div></article>`;
     };
 
@@ -7025,6 +7066,11 @@
       .filter((item) => item.itemType === "resource")
       .map(templateCard)
       .join("");
+    const investigationTemplates = state.resourceLibrary
+      .filter((item) => item.itemType === "investigation")
+      .map(templateCard)
+      .join("");
+
     const healingTemplates = state.resourceLibrary
       .filter((item) => item.itemType === "healing")
       .map(templateCard)
@@ -7046,7 +7092,9 @@
                     ? `<button type="button" class="button button--small" data-evidence-id="${escapeHtml(item.uid)}">보기</button>${character.role === "survivor" ? `<button type="button" class="button button--small button--primary" data-use-healing-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>` : ""}`
                     : item.itemType === "warming"
                       ? `<button type="button" class="button button--small" data-evidence-id="${escapeHtml(item.uid)}">보기</button><button type="button" class="button button--small button--primary" data-use-warming-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>`
-                      : `<button type="button" class="button button--small" data-evidence-id="${escapeHtml(item.uid)}">${item.itemType === "resource" ? "열람" : "보기"}</button>`;
+                      : item.itemType === "investigation"
+                        ? `<button type="button" class="button button--small" data-evidence-id="${escapeHtml(item.uid)}">보기</button>${item.consumable ? `<button type="button" class="button button--small button--primary" data-use-investigation-item="${escapeHtml(item.uid)}" data-character-id="${character.id}">사용</button>` : ""}`
+                        : `<button type="button" class="button button--small" data-evidence-id="${escapeHtml(item.uid)}">${item.itemType === "resource" ? "열람" : "보기"}</button>`;
                 return `<div class="character-inventory-item"><div class="character-inventory-item__copy"><div class="character-inventory-item__title"><strong>${escapeHtml(item.title)}</strong>${inventoryItemBadgeMarkup(item)}</div><p>${escapeHtml(item.description)}</p></div><div class="character-inventory-item__actions">${actions}</div></div>`;
               })
               .join("")
@@ -7066,7 +7114,8 @@
           <form class="operations-form" data-resource-library-form>
             <label>소지품 종류
               <select class="form-control" name="itemType" data-item-type-select>
-                <option value="resource">조사 자료</option>
+                <option value="resource">조사 물품</option>
+                <option value="investigation">조사 아이템</option>
                 <option value="healing">체력 회복 아이템</option>
                 <option value="warming">방한 아이템</option>
               </select>
@@ -7110,7 +7159,17 @@
                 <label>열람용 썸네일 이미지<input class="form-control" type="file" name="thumbnail" accept="image/*" /></label>
               </div>
               <label>다운로드용 원본 파일<input class="form-control" type="file" name="original" /></label>
-              <p class="form-help">조사 자료는 플레이어가 열람하거나 원본 파일을 받을 수 있습니다.</p>
+              <p class="form-help">조사 물품은 플레이어가 열람하거나 원본 파일을 받을 수 있습니다.</p>
+            </div>
+
+            <div class="investigation-item-fields" data-investigation-item-fields hidden>
+              <label>사용 여부
+                <select class="form-control" name="investigationUseMode" disabled>
+                  <option value="keep">비사용</option>
+                  <option value="use">사용</option>
+                </select>
+              </label>
+              <p class="form-help">사용: 소지품에 사용 버튼이 표시되며, 누르면 별도 효과 없이 아이템이 사라집니다. 비사용: 사용 버튼 없이 소지품에 계속 등록되어 있습니다.</p>
             </div>
 
             <div class="healing-item-fields" data-healing-item-fields hidden>
@@ -7124,8 +7183,13 @@
         </section>
 
         <section class="operations-card">
-          <header><div><p class="eyebrow">INVESTIGATION RESOURCES</p><h2>등록된 조사 자료</h2></div><span>${state.resourceLibrary.filter((item) => item.itemType === "resource").length}건</span></header>
-          <div class="resource-library-list">${resourceTemplates || emptyStateMarkup("등록된 조사 자료가 없습니다.")}</div>
+          <header><div><p class="eyebrow">INVESTIGATION RESOURCES</p><h2>등록된 조사 물품</h2></div><span>${state.resourceLibrary.filter((item) => item.itemType === "resource").length}건</span></header>
+          <div class="resource-library-list">${resourceTemplates || emptyStateMarkup("등록된 조사 물품이 없습니다.")}</div>
+        </section>
+
+        <section class="operations-card">
+          <header><div><p class="eyebrow">INVESTIGATION ITEMS</p><h2>등록된 조사 아이템</h2></div><span>${state.resourceLibrary.filter((item) => item.itemType === "investigation").length}건</span></header>
+          <div class="resource-library-list">${investigationTemplates || emptyStateMarkup("등록된 조사 아이템이 없습니다.")}</div>
         </section>
 
         <section class="operations-card">
@@ -7347,12 +7411,43 @@
         ? "healing"
         : requestedItemType === "warming"
           ? "warming"
-          : "resource";
+          : requestedItemType === "investigation"
+            ? "investigation"
+            : "resource";
     const title = String(formData.get("title") || "").trim();
     const description = String(formData.get("description") || "").trim();
     if (!title || !description) return;
 
     const itemId = `inventory-template-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    if (itemType === "investigation") {
+      const consumable =
+        String(formData.get("investigationUseMode") || "keep") === "use";
+
+      state.resourceLibrary.unshift({
+        id: itemId,
+        itemType: "investigation",
+        consumable,
+        title,
+        description,
+        healAmount: 0,
+        certainty: "confirmed",
+        thumbnailKey: null,
+        thumbnailName: null,
+        thumbnailSize: 0,
+        originalKey: null,
+        originalName: null,
+        originalSize: 0,
+        originalType: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      addLog(`운영진이 조사 아이템 「${title}」을(를) 등록했습니다.`);
+      persistState();
+      renderAdminOperationsPage();
+      showToast(`조사 아이템 「${title}」을(를) 등록했습니다.`);
+      return;
+    }
 
     if (itemType === "healing") {
       const healAmount = Math.round(Number(formData.get("healAmount")));
@@ -7417,14 +7512,14 @@
     const discoveryRoom = String(formData.get("discoveryRoom") || "").trim();
 
     if (!FLOOR_DEFINITIONS[discoveryFloor]) {
-      return showToast("조사 자료를 발견한 층을 선택해 주세요.");
+      return showToast("조사 물품을 발견한 층을 선택해 주세요.");
     }
 
     if (
       !discoveryRoom ||
       !resourceDiscoveryRoomLabels(discoveryFloor).includes(discoveryRoom)
     ) {
-      return showToast("조사 자료를 발견한 장소를 선택해 주세요.");
+      return showToast("조사 물품을 발견한 장소를 선택해 주세요.");
     }
 
     const certainty = normalizeCertaintyV3(
@@ -7496,14 +7591,14 @@
       createdAt: new Date().toISOString(),
     });
     addLog(
-      `운영진이 조사 자료 「${title}」을(를) ${resourceDiscoveryLocationText({
+      `운영진이 조사 물품 「${title}」을(를) ${resourceDiscoveryLocationText({
         floor: discoveryFloor,
         room: discoveryRoom,
       })} 발견 자료로 등록했습니다.`,
     );
     persistState();
     renderAdminOperationsPage();
-    showToast("조사 자료를 등록했습니다.");
+    showToast("조사 물품을 등록했습니다.");
   }
 
   function deliverResource(formData) {
@@ -7533,6 +7628,8 @@
         sourceId: template.id,
         itemType: template.itemType,
         healAmount: template.healAmount || 0,
+        consumable:
+          template.itemType === "investigation" && template.consumable === true,
         title: template.title,
         description: template.description,
         certainty: "confirmed",
@@ -7590,20 +7687,22 @@
     normalizeStoredInventoryItem(evidence);
     const isHealing = evidence.itemType === "healing";
     const isWarming = evidence.itemType === "warming";
+    const isInvestigation = evidence.itemType === "investigation";
     const isBasic = evidence.itemType === "basic";
     const imageMarkup = evidence.thumbnailKey
       ? `<figure class="evidence-image"><img data-media-key="${escapeHtml(evidence.thumbnailKey)}" alt="${escapeHtml(evidence.title)} 첨부 이미지" /></figure>`
       : evidence.imageData
         ? `<figure class="evidence-image"><img src="${evidence.imageData}" alt="${escapeHtml(evidence.title)} 첨부 이미지" /></figure>`
-        : `<div class="evidence-detail__image evidence-detail__image--${isHealing && session?.type === "admin" ? "healing" : isWarming ? "warming" : isBasic ? "basic" : "resource"}">${isHealing && session?.type === "admin" ? "HP" : isHealing ? "◇" : isWarming ? "防" : isBasic ? "◇" : "▤"}</div>`;
+        : `<div class="evidence-detail__image evidence-detail__image--${isHealing && session?.type === "admin" ? "healing" : isWarming ? "warming" : isInvestigation ? "basic" : isBasic ? "basic" : "resource"}">${isHealing && session?.type === "admin" ? "HP" : isHealing ? "◇" : isWarming ? "防" : isInvestigation ? "◇" : isBasic ? "◇" : "▤"}</div>`;
 
     const originalKey =
       !isHealing &&
+      !isInvestigation &&
       !isBasic &&
       (evidence.originalKey || evidence.thumbnailKey || null);
     const downloadButton = originalKey
       ? `<button type="button" class="button button--primary" data-download-media-key="${escapeHtml(originalKey)}" data-download-name="${escapeHtml(evidence.originalName || evidence.thumbnailName || evidence.fileName || `${evidence.title}.bin`)}">원본 파일 다운로드</button>`
-      : !isHealing && evidence.imageData
+      : !isHealing && !isInvestigation && evidence.imageData
         ? `<a class="button button--primary" href="${evidence.imageData}" download="${escapeHtml(evidence.fileName || `${evidence.title}.png`)}">사진 다운로드</a>`
         : "";
 
@@ -7616,11 +7715,13 @@
         : ""
       : isWarming
         ? `<div><span>종류</span><strong>방한 아이템</strong></div>`
-        : isBasic
-          ? `<div><span>종류</span><strong>일반 소지품</strong></div>`
-          : isPlayerView
-            ? `<div><span>종류</span><strong>조사 자료</strong></div><div><span>발견 장소</span><strong>${escapeHtml(resourceDiscoveryLocationText(evidence))}</strong></div>`
-            : `<div><span>종류</span><strong>조사 자료</strong></div><div><span>정보 상태</span><strong>${certaintyLabel(evidence.certainty)}</strong></div><div><span>등록·발견자</span><strong>${escapeHtml(evidence.discoveredBy || "미상")}</strong></div><div><span>발견 장소</span><strong>${escapeHtml(resourceDiscoveryLocationText(evidence))}</strong></div><div><span>열람용 썸네일</span><strong>${escapeHtml(evidence.thumbnailName || evidence.fileName || "없음")}</strong></div><div><span>다운로드 원본</span><strong>${escapeHtml(evidence.originalName || evidence.fileName || "없음")}${evidence.originalSize ? ` · ${formatFileSizeV3(evidence.originalSize)}` : ""}</strong></div>`;
+        : isInvestigation
+          ? `<div><span>종류</span><strong>조사 아이템</strong></div>`
+          : isBasic
+            ? `<div><span>종류</span><strong>일반 소지품</strong></div>`
+            : isPlayerView
+              ? `<div><span>종류</span><strong>조사 물품</strong></div><div><span>발견 장소</span><strong>${escapeHtml(resourceDiscoveryLocationText(evidence))}</strong></div>`
+              : `<div><span>종류</span><strong>조사 물품</strong></div><div><span>정보 상태</span><strong>${certaintyLabel(evidence.certainty)}</strong></div><div><span>등록·발견자</span><strong>${escapeHtml(evidence.discoveredBy || "미상")}</strong></div><div><span>발견 장소</span><strong>${escapeHtml(resourceDiscoveryLocationText(evidence))}</strong></div><div><span>열람용 썸네일</span><strong>${escapeHtml(evidence.thumbnailName || evidence.fileName || "없음")}</strong></div><div><span>다운로드 원본</span><strong>${escapeHtml(evidence.originalName || evidence.fileName || "없음")}${evidence.originalSize ? ` · ${formatFileSizeV3(evidence.originalSize)}` : ""}</strong></div>`;
     const typeRow = isPlayerHealingItem
       ? ""
       : `<div class="evidence-detail__type-row">${inventoryItemBadgeMarkup(evidence)}</div>`;
@@ -7635,9 +7736,11 @@
           ? "HEALING ITEM"
           : isWarming
             ? "WARMING ITEM"
-            : isBasic
-              ? "ITEM"
-              : "ITEM / EVIDENCE",
+            : isInvestigation
+              ? "INVESTIGATION ITEM"
+              : isBasic
+                ? "ITEM"
+                : "ITEM / EVIDENCE",
       title: evidence.title,
       body: `<div class="evidence-detail">${imageMarkup}${typeRow}<p>${escapeHtml(evidence.description)}</p>${detailGrid}</div>`,
       footer: `${downloadButton}<button type="button" class="button" data-modal-close>닫기</button>`,
@@ -11913,13 +12016,19 @@
         ? "healing"
         : item.itemType === "warming"
           ? "warming"
-          : item.itemType === "basic"
-            ? "basic"
-            : "resource";
+          : item.itemType === "investigation"
+            ? "investigation"
+            : item.itemType === "basic"
+              ? "basic"
+              : "resource";
     item.healAmount =
       item.itemType === "healing"
         ? Math.max(1, Math.min(100, Math.round(Number(item.healAmount) || 1)))
         : 0;
+    item.consumable =
+      item.itemType === "investigation"
+        ? item.consumable === true || item.useMode === "use"
+        : false;
     item.grantMode =
       item.grantMode === "starting"
         ? "starting"
@@ -11934,8 +12043,9 @@
     normalizeStoredInventoryItem(item);
     if (item.itemType === "healing") return "체력 회복 아이템";
     if (item.itemType === "warming") return "방한 아이템";
+    if (item.itemType === "investigation") return "조사 아이템";
     if (item.itemType === "basic") return "일반 소지품";
-    return "조사 자료";
+    return "조사 물품";
   }
 
   function inventoryGrantLabel(item) {
@@ -11956,11 +12066,15 @@
       return `<span class="inventory-type-badge inventory-type-badge--warming">방한 아이템</span>`;
     }
 
+    if (item.itemType === "investigation") {
+      return `<span class="inventory-type-badge inventory-type-badge--basic">조사 아이템</span>`;
+    }
+
     if (item.itemType === "basic") {
       return `<span class="inventory-type-badge inventory-type-badge--basic">소지품</span>`;
     }
 
-    return `<span class="inventory-type-badge inventory-type-badge--resource">조사 자료</span>`;
+    return `<span class="inventory-type-badge inventory-type-badge--resource">조사 물품</span>`;
   }
 
   function healthGaugeMarkup(character, compact = false) {
@@ -12032,6 +12146,105 @@
     showToast(`「${item.title}」을(를) 사용했습니다.`);
   }
 
+  async function useInvestigationItem(characterId, itemUid) {
+    const character = getCharacter(Number(characterId));
+
+    if (!character) {
+      return showToast("캐릭터를 찾지 못했습니다.");
+    }
+
+    const adminUse = session?.type === "admin";
+    const playerSelfUse =
+      session?.type === "player" &&
+      Number(session.characterId) === Number(character.id);
+
+    if (!adminUse && !playerSelfUse) {
+      return showToast("이 아이템을 사용할 권한이 없습니다.");
+    }
+
+    if (!Array.isArray(character.inventory)) {
+      character.inventory = [];
+    }
+
+    const index = character.inventory.findIndex(
+      (item) => String(item.uid) === String(itemUid),
+    );
+
+    if (index < 0) {
+      return showToast("조사 아이템을 찾지 못했습니다.");
+    }
+
+    const item = character.inventory[index];
+    normalizeStoredInventoryItem(item);
+
+    if (item.itemType !== "investigation") {
+      return showToast("조사 아이템만 사용할 수 있습니다.");
+    }
+
+    if (!item.consumable) {
+      return showToast("비사용 조사 아이템은 소모할 수 없습니다.");
+    }
+
+    /*
+     * 플레이어 사용은 서버 전용 액션으로 처리한다.
+     * 사용 효과는 없고, 서버에서 해당 아이템 1개만 소지품에서 제거한다.
+     */
+    if (playerSelfUse && session?.token && isRemoteConfigured()) {
+      try {
+        const result = await remoteApi("use-investigation-item", {
+          itemUid: String(itemUid),
+        });
+
+        if (!result?.state) {
+          throw new Error("INVESTIGATION_ITEM_RESPONSE_INVALID");
+        }
+
+        const incomingVersion = Number(result.version || 0);
+        if (incomingVersion >= remoteState.version) {
+          remoteState.applying = true;
+          try {
+            state = ensureFeatureState(result.state);
+            remoteState.version = incomingVersion;
+            storage.setItem(STORAGE_KEY, JSON.stringify(state));
+          } finally {
+            remoteState.applying = false;
+          }
+        }
+
+        renderAll();
+        showToast(`「${item.title}」을(를) 사용했습니다.`);
+        return;
+      } catch (error) {
+        console.error("조사 아이템 사용 실패", error);
+        await refreshRemoteState({ quiet: true });
+        if (error.code === "ITEM_NOT_FOUND") {
+          showToast("이미 사용되었거나 존재하지 않는 조사 아이템입니다.");
+        } else if (error.code === "ITEM_NOT_USABLE") {
+          showToast("이 조사 아이템은 비사용 아이템입니다.");
+        } else {
+          showToast("조사 아이템 사용 처리에 실패했습니다.");
+        }
+        return;
+      }
+    }
+
+    /*
+     * 관리자는 기존 관리자 전체 상태 저장 권한으로 처리한다.
+     */
+    character.inventory.splice(index, 1);
+    addLog(
+      `관리자가 ${character.name}의 조사 아이템 「${item.title}」을(를) 사용 처리했습니다.`,
+    );
+    persistState();
+    renderAll();
+
+    if (ui.operationsOpen) {
+      renderAdminOperationsPage();
+    }
+
+    showToast(`「${item.title}」을(를) 사용했습니다.`);
+  }
+
   function useHealingItem(characterId, itemUid) {
     const character = getCharacter(Number(characterId));
     if (!character) return showToast("캐릭터를 찾지 못했습니다.");
@@ -12090,9 +12303,13 @@
 
     const typeSelect = form.querySelector('[name="itemType"]');
     const resourceFields = form.querySelector("[data-resource-item-fields]");
+    const investigationFields = form.querySelector(
+      "[data-investigation-item-fields]",
+    );
     const healingFields = form.querySelector("[data-healing-item-fields]");
     const itemType = String(typeSelect?.value || "resource");
     const isResource = itemType === "resource";
+    const isInvestigation = itemType === "investigation";
     const isHealing = itemType === "healing";
 
     if (resourceFields) {
@@ -12101,6 +12318,21 @@
         .querySelectorAll("input, select, textarea")
         .forEach((control) => {
           control.disabled = !isResource;
+          if (control instanceof HTMLSelectElement) {
+            syncCommonSelect(control);
+          }
+        });
+    }
+
+    if (investigationFields) {
+      investigationFields.hidden = !isInvestigation;
+      investigationFields
+        .querySelectorAll("input, select, textarea")
+        .forEach((control) => {
+          control.disabled = !isInvestigation;
+          if (control instanceof HTMLSelectElement) {
+            syncCommonSelect(control);
+          }
         });
     }
 
@@ -12110,6 +12342,9 @@
         .querySelectorAll("input, select, textarea")
         .forEach((control) => {
           control.disabled = !isHealing;
+          if (control instanceof HTMLSelectElement) {
+            syncCommonSelect(control);
+          }
         });
     }
 
