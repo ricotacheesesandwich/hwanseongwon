@@ -14197,3 +14197,274 @@ body.theme-survivor.theme-mode-dark
     justify-self: end;
   }
 }
+
+/* =========================================================
+   생존자 전용 — 튜토리얼 / 도움말
+   - 긴급 이벤트 버튼 바로 옆의 작은 ? 버튼
+   - 1~8번 이미지 순차 표시
+   - 마지막 8번에서만 닫기 X 표시
+   ========================================================= */
+
+.topbar__center .survivor-help-button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid #8aa8c5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #214f7d;
+  box-shadow: 0 3px 10px rgba(24, 60, 96, 0.1);
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 950;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.topbar__center .survivor-help-button:hover,
+.topbar__center .survivor-help-button:focus-visible {
+  border-color: #315f8e;
+  background: #eef5fb;
+  color: #173d67;
+  box-shadow: 0 4px 12px rgba(24, 60, 96, 0.16);
+  outline: none;
+}
+
+body.theme-survivor.theme-mode-dark .topbar__center .survivor-help-button {
+  border-color: #426b96;
+  background: #13283a;
+  color: #f7fbff;
+  box-shadow: 0 3px 10px rgba(7, 24, 41, 0.24);
+}
+
+body.theme-survivor.theme-mode-dark .topbar__center .survivor-help-button:hover,
+body.theme-survivor.theme-mode-dark
+  .topbar__center
+  .survivor-help-button:focus-visible {
+  border-color: #6b9ac7;
+  background: #1b3a56;
+}
+
+.survivor-tutorial-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 14, 24, 0.76);
+  backdrop-filter: blur(5px);
+}
+
+.survivor-tutorial {
+  position: relative;
+  width: min(1120px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #b7c9d9;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(2, 16, 30, 0.34);
+}
+
+.survivor-tutorial__image-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px 24px 12px;
+  background: #f7f9fb;
+}
+
+.survivor-tutorial__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center;
+}
+
+.survivor-tutorial__image-placeholder {
+  display: grid;
+  width: min(760px, 90%);
+  min-height: 320px;
+  place-items: center;
+  padding: 32px;
+  border: 2px dashed #a8bbcd;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #315f8e;
+  font-size: 1.05rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.survivor-tutorial__controls {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  gap: 16px;
+  min-height: 76px;
+  padding: 12px 20px;
+  border-top: 1px solid #d9e3ec;
+  background: #ffffff;
+}
+
+.survivor-tutorial__arrow {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #8aa8c5;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #214f7d;
+  font: inherit;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.survivor-tutorial__arrow:hover:not(:disabled),
+.survivor-tutorial__arrow:focus-visible:not(:disabled) {
+  border-color: #315f8e;
+  background: #eef5fb;
+  outline: none;
+}
+
+.survivor-tutorial__arrow:disabled {
+  opacity: 0.26;
+  cursor: default;
+}
+
+.survivor-tutorial__counter {
+  color: #4b6177;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.survivor-tutorial__close {
+  position: absolute;
+  z-index: 4;
+  top: 14px;
+  right: 14px;
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 1px solid rgba(35, 72, 105, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: #173d67;
+  box-shadow: 0 5px 16px rgba(17, 45, 70, 0.16);
+  font: inherit;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.survivor-tutorial__close:hover,
+.survivor-tutorial__close:focus-visible {
+  background: #eef5fb;
+  outline: none;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial {
+  border-color: #35546f;
+  background: #101b28;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__image-wrap {
+  background: #0e1925;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__image-placeholder {
+  border-color: #456785;
+  background: #13283a;
+  color: #eaf4ff;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__controls {
+  border-top-color: #2c465d;
+  background: #101b28;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__arrow {
+  border-color: #426b96;
+  background: #13283a;
+  color: #f7fbff;
+}
+
+body.theme-survivor.theme-mode-dark
+  .survivor-tutorial__arrow:hover:not(:disabled),
+body.theme-survivor.theme-mode-dark
+  .survivor-tutorial__arrow:focus-visible:not(:disabled) {
+  border-color: #6b9ac7;
+  background: #1b3a56;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__counter {
+  color: #c9d9e8;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__close {
+  border-color: #426b96;
+  background: rgba(16, 27, 40, 0.96);
+  color: #f7fbff;
+}
+
+body.theme-survivor.theme-mode-dark .survivor-tutorial__close:hover,
+body.theme-survivor.theme-mode-dark .survivor-tutorial__close:focus-visible {
+  background: #1b3a56;
+}
+
+@media (max-width: 720px) {
+  .survivor-tutorial-backdrop {
+    padding: 10px;
+  }
+
+  .survivor-tutorial {
+    width: calc(100vw - 20px);
+    height: calc(100vh - 20px);
+    border-radius: 13px;
+  }
+
+  .survivor-tutorial__image-wrap {
+    padding: 14px 12px 8px;
+  }
+
+  .survivor-tutorial__controls {
+    min-height: 68px;
+    padding: 10px 14px;
+  }
+}
+
+/* 튜토리얼 전용 숨김 상태 */
+.topbar__center .survivor-help-button.is-hidden,
+.survivor-tutorial-backdrop.is-hidden,
+.survivor-tutorial__close.is-hidden,
+.survivor-tutorial__image.is-hidden,
+.survivor-tutorial__image-placeholder.is-hidden {
+  display: none;
+}
