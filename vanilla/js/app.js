@@ -3170,7 +3170,18 @@
         createCharacter(111, "이건하", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(112, "유수담", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(113, "유애호", "survivor", 0, 0, "1F", 2, 3, [], false),
-        createCharacter(114, "사공이진", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(
+          114,
+          "사공이진",
+          "survivor",
+          0,
+          0,
+          "1F",
+          2,
+          3,
+          [],
+          false,
+        ),
         createCharacter(115, "권신예", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(116, "하설유", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(117, "하도야", "survivor", 0, 0, "1F", 2, 3, [], false),
@@ -3183,6 +3194,7 @@
         createCharacter(124, "제하연", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(125, "이루한", "survivor", 0, 0, "1F", 2, 3, [], false),
         createCharacter(126, "백우양", "survivor", 0, 0, "1F", 2, 3, [], false),
+        createCharacter(127, "진백", "survivor", 0, 0, "1F", 2, 3, [], false),
       ],
       teams: [
         {
@@ -4303,10 +4315,7 @@
     },
     (_, index) =>
       Number(
-        (
-          SPACE_BURNING_ADD_MIN +
-          index * SPACE_BURNING_ADD_STEP
-        ).toFixed(1),
+        (SPACE_BURNING_ADD_MIN + index * SPACE_BURNING_ADD_STEP).toFixed(1),
       ),
   );
 
@@ -4562,8 +4571,7 @@
 
     if (elements.survivorTutorialImage) {
       elements.survivorTutorialImage.classList.remove("is-hidden");
-      elements.survivorTutorialImage.alt =
-        `생존자 튜토리얼 ${pageNumber}번 사진`;
+      elements.survivorTutorialImage.alt = `생존자 튜토리얼 ${pageNumber}번 사진`;
       elements.survivorTutorialImage.src = imageSrc;
     }
 
@@ -4573,8 +4581,7 @@
     }
 
     if (elements.survivorTutorialCounter) {
-      elements.survivorTutorialCounter.textContent =
-        `${pageNumber} / ${SURVIVOR_TUTORIAL_IMAGES.length}`;
+      elements.survivorTutorialCounter.textContent = `${pageNumber} / ${SURVIVOR_TUTORIAL_IMAGES.length}`;
     }
 
     if (elements.survivorTutorialPrev) {
@@ -9861,10 +9868,7 @@
     const clampLeft = (value) =>
       Math.max(
         viewportPadding,
-        Math.min(
-          value,
-          window.innerWidth - portalRect.width - viewportPadding,
-        ),
+        Math.min(value, window.innerWidth - portalRect.width - viewportPadding),
       );
     const clampTop = (value) =>
       Math.max(
@@ -9917,15 +9921,13 @@
           0,
         );
         const distance =
-          Math.abs(left - toggleRect.left) +
-          Math.abs(top - centeredTop) * 0.15;
+          Math.abs(left - toggleRect.left) + Math.abs(top - centeredTop) * 0.15;
         candidates.push({ left, top, tokenOverlap, distance });
       }
     }
 
     candidates.sort(
-      (a, b) =>
-        a.tokenOverlap - b.tokenOverlap || a.distance - b.distance,
+      (a, b) => a.tokenOverlap - b.tokenOverlap || a.distance - b.distance,
     );
 
     const best = candidates[0];
@@ -10562,8 +10564,9 @@
         const token = elements.mapGrid?.querySelector(
           `[data-token-character="${actor.id}"]`,
         );
-        const currentCell =
-          elements.mapGrid?.querySelector(".map-cell.is-current");
+        const currentCell = elements.mapGrid?.querySelector(
+          ".map-cell.is-current",
+        );
         const target = token || currentCell;
 
         if (target?.scrollIntoView) {
@@ -11258,12 +11261,7 @@
     }
 
     if (session?.type === "player" && session?.token) {
-      void performRemoteSpiritMove(
-        character,
-        exit.floor,
-        exit.x,
-        exit.y,
-      );
+      void performRemoteSpiritMove(character, exit.floor, exit.x, exit.y);
       return;
     }
 
